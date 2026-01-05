@@ -6,7 +6,8 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <exclude domain="sharedpref" path="T1DAlertPrefs.xml" />
-    <exclude domain="sharedpref" path="T1DAlertPrefs__androidx_security_crypto_encrypted_prefs_key_keyset__.xml" />
-    <exclude domain="sharedpref" path="T1DAlertPrefs__androidx_security_crypto_encrypted_prefs_value_keyset__.xml" />
+    <!--
+   <include domain="sharedpref" path="."/>
+   <exclude domain="sharedpref" path="device.xml"/>
+-->
 </full-backup-content>

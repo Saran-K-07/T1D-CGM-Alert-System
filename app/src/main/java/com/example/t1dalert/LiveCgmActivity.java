@@ -1,39 +1,44 @@
 package com.example.t1dalert;
 
-import android.content.Context;
-import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.widget.Button;
+import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.android.volley.DefaultRetryPolicy;
+import com.android.volley.Request;
 import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import android.content.Context;
+import android.content.SharedPreferences;
 
 public class LiveCgmActivity extends AppCompatActivity {
 
     private TextView cgmValueTextView;
     private TextView cgmTrendTextView;
-    private TextView mlPredictionValueTextView;
-    private TextView mlPredictionStatusTextView;
-    private CgmRepository cgmRepository;
+    private RequestQueue requestQueue;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private final Runnable cgmDataRefresher = new Runnable() {
         @Override
         public void run() {
             fetchCgmData();
-            handler.postDelayed(this, AppConfig.CGM_REFRESH_INTERVAL_MS);
+            final int REFRESH_INTERVAL = 60000; // 1 minute
+            handler.postDelayed(this, REFRESH_INTERVAL);
         }
     };
 
@@ -50,95 +55,105 @@ public class LiveCgmActivity extends AppCompatActivity {
 
         cgmValueTextView = findViewById(R.id.cgm_value);
         cgmTrendTextView = findViewById(R.id.cgm_trend);
-        mlPredictionValueTextView = findViewById(R.id.ml_prediction_value);
-        mlPredictionStatusTextView = findViewById(R.id.ml_prediction_status);
-        Button settingsButton = findViewById(R.id.settings_button);
-        Button chartButton = findViewById(R.id.chart_button);
 
-        RequestQueue requestQueue = Volley.newRequestQueue(LiveCgmActivity.this);
-        cgmRepository = new CgmRepository(this, requestQueue);
-
-        settingsButton.setOnClickListener(v -> {
-            Intent intent = new Intent(LiveCgmActivity.this, Settings.class);
-            startActivity(intent);
-        });
-
-        chartButton.setOnClickListener(v -> {
-            Intent intent = new Intent(LiveCgmActivity.this, MlPredictionChartActivity.class);
-            startActivity(intent);
-        });
+        requestQueue = Volley.newRequestQueue(LiveCgmActivity.this);
 
         handler.post(cgmDataRefresher);
     }
 
     private void fetchCgmData() {
-        SharedPreferences sharedPreferences = AppPrefsStore.get(this);
-        if (sharedPreferences.getString(AppPrefs.KEY_NIGHTSCOUT_URL, "").trim().isEmpty()) {
-            cgmValueTextView.setText(R.string.live_cgm_missing_url_short);
-            cgmTrendTextView.setText(R.string.live_cgm_trend_unavailable_short);
-            Toast.makeText(this, R.string.nightscout_url_missing, Toast.LENGTH_SHORT).show();
-            return;
+        SharedPreferences sharedPreferences = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
+        String url = sharedPreferences.getString(MainActivity.KEY_NIGHTSCOUT_URL, "");
+        String apiToken = sharedPreferences.getString(MainActivity.KEY_API_TOKEN, "");
+        String accessToken = sharedPreferences.getString(MainActivity.KEY_ACCESS_TOKEN, "");
+
+        try{
+            apiToken = URLEncoder.encode(apiToken, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
         }
 
-        int low = CgmUtils.parseIntOrDefault(
-                sharedPreferences.getString(AppPrefs.KEY_LOW_SGV, String.valueOf(AppConfig.DEFAULT_LOW_SGV)),
-                AppConfig.DEFAULT_LOW_SGV
-        );
-        int high = CgmUtils.parseIntOrDefault(
-                sharedPreferences.getString(AppPrefs.KEY_HIGH_SGV, String.valueOf(AppConfig.DEFAULT_HIGH_SGV)),
-                AppConfig.DEFAULT_HIGH_SGV
-        );
+        if(url.startsWith("http://")) {
+            url = url.substring(7);
+            url = "http://" + apiToken + "@" + url;
+        };
 
-        cgmRepository.fetchLatest(new CgmRepository.Listener() {
-            @Override
-            public void onSuccess(CgmData data) {
-                cgmValueTextView.setText(String.valueOf(data.sgv));
-                cgmTrendTextView.setText(CgmUtils.getTrendArrow(data.direction));
-                if (data.sgv < low || data.sgv > high) {
-                    cgmValueTextView.setTextColor(ContextCompat.getColor(LiveCgmActivity.this, R.color.cgm_alert_red));
-                } else {
-                    cgmValueTextView.setTextColor(ContextCompat.getColor(LiveCgmActivity.this, R.color.cgm_text_normal));
-                }
-                updateMlStatus(sharedPreferences);
-            }
+        if(url.startsWith("https://")){
+            url = url.substring(8);
+            url = "https://" + apiToken + "@" + url;
+        }
 
-            @Override
-            public void onSchemaError() {
-                cgmValueTextView.setText(R.string.live_cgm_format_short);
-                cgmTrendTextView.setText(R.string.live_cgm_trend_unavailable_short);
-                updateMlStatus(sharedPreferences);
-                Toast.makeText(LiveCgmActivity.this, R.string.error_parsing_data, Toast.LENGTH_SHORT).show();
-            }
+        if(!url.startsWith("http://")&&!url.startsWith("https://")){
+            url = "http://" + apiToken + "@" + url;
+        }
 
-            @Override
-            public void onNetworkError() {
-                cgmValueTextView.setText(R.string.live_cgm_loading_failed_short);
-                cgmTrendTextView.setText(R.string.live_cgm_trend_unavailable_short);
-                updateMlStatus(sharedPreferences);
-                Toast.makeText(LiveCgmActivity.this, R.string.error_fetching_data, Toast.LENGTH_SHORT).show();
-            }
-        });
+
+        String apiUrl = url + "/api/v1/entries?token=" + accessToken + "&count=1";
+
+        StringRequest request = new StringRequest(Request.Method.GET, apiUrl,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        try {
+                            if (response != null && !response.trim().isEmpty()) {
+                                String[] lines = response.split("\n");
+                                if (lines.length > 0) {
+                                    String[] parts = lines[0].split("\t");
+
+                                    if (parts.length >= 4) {
+                                        String sgv = parts[2];
+                                        String direction = parts[3].replace("\"", "");
+
+                                        cgmValueTextView.setText(sgv);
+                                        cgmTrendTextView.setText(getTrendArrow(direction));
+                                    } else {
+                                        Log.w("LiveCgmActivity", "Unexpected data format: " + lines[0]);
+                                        cgmValueTextView.setText("Fmt");
+                                    }
+                                }
+                            } else {
+                                Log.w("LiveCgmActivity", "API returned an empty response.");
+                                cgmValueTextView.setText("N/A");
+                            }
+                        } catch (Exception e) {
+                            Log.e("LiveCgmActivity", "Error parsing string response", e);
+                            Toast.makeText(LiveCgmActivity.this, "Error parsing data", Toast.LENGTH_SHORT).show();
+                            cgmValueTextView.setText("Err");
+                        }
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                    Log.e("LiveCgmActivity", "Volley request failed: " + error.toString());
+                    Toast.makeText(LiveCgmActivity.this, "Failed to fetch data", Toast.LENGTH_SHORT).show();
+                    cgmValueTextView.setText("---");
+                    cgmTrendTextView.setText("X");
+                }});
+
+        request.setRetryPolicy(new DefaultRetryPolicy(10000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES,DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+        requestQueue.add(request);
     }
 
-    private void updateMlStatus(SharedPreferences prefs) {
-        String status = prefs.getString(AppPrefs.KEY_ML_STATUS, MlRuntimeStatus.WARMING_UP);
-        int prediction = prefs.getInt(AppPrefs.KEY_ML_PREDICTION_MGDL, Integer.MIN_VALUE);
-
-        if (MlRuntimeStatus.READY.equals(status) && prediction != Integer.MIN_VALUE) {
-            mlPredictionValueTextView.setText(getString(R.string.ml_prediction_value, prediction));
-            mlPredictionStatusTextView.setText(R.string.ml_status_ready);
-            return;
-        }
-
-        mlPredictionValueTextView.setText(R.string.ml_prediction_placeholder);
-        if (MlRuntimeStatus.MODEL_UNAVAILABLE.equals(status)) {
-            mlPredictionStatusTextView.setText(R.string.ml_status_model_unavailable);
-        } else if (MlRuntimeStatus.METADATA_INVALID.equals(status)) {
-            mlPredictionStatusTextView.setText(R.string.ml_status_metadata_invalid);
-        } else if (MlRuntimeStatus.PREDICTION_FAILED.equals(status)) {
-            mlPredictionStatusTextView.setText(R.string.ml_status_prediction_failed);
-        } else {
-            mlPredictionStatusTextView.setText(R.string.ml_status_warming);
+    private String getTrendArrow(String trendString) {
+        if (trendString == null) return "?";
+        switch (trendString) {
+            case "DoubleUp":
+                return "↑↑";
+            case "SingleUp":
+                return "↑";
+            case "FortyFiveUp":
+                return "↗";
+            case "Flat":
+                return "→";
+            case "FortyFiveDown":
+                return "↘";
+            case "SingleDown":
+                return "↓";
+            case "DoubleDown":
+                return "↓↓";
+            default:
+                return "?";
         }
     }
 
