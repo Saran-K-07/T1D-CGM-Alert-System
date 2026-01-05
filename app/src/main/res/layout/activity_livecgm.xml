@@ -29,4 +29,24 @@
         app:layout_constraintTop_toBottomOf="@+id/cgm_value"
         tools:text="→" />
 
+    <TextView
+        android:id="@+id/cgm_unit"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:text="mg/dL"
+        android:textSize="20sp"
+        app:layout_constraintBaseline_toBaselineOf="@+id/cgm_value"
+        app:layout_constraintStart_toEndOf="@+id/cgm_value" />
+
+    <Button
+        android:id="@+id/settings_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="40dp"
+        android:text="Settings"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/cgm_trend" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
