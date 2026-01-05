@@ -1,19 +1,18 @@
 package com.example.t1dalert;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
-
-import android.widget.Button;
-import android.view.View;
-import android.widget.Toast;
-import android.content.Context;
 
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -22,6 +21,8 @@ public class MainActivity extends AppCompatActivity {
     public static final String KEY_NIGHTSCOUT_URL = "nightscout_url";
     public static final String KEY_API_TOKEN = "api_token";
     public static final String KEY_ACCESS_TOKEN = "access_token";
+    public static final String KEY_LOW_SGV = "low_sgv";
+    public static final String KEY_HIGH_SGV = "high_sgv";
 
     private TextInputEditText nightscoutUrlEditText;
     private TextInputEditText apiTokenEditText;
