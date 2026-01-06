@@ -18,14 +18,13 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-import com.android.volley.AuthFailureError;
-import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
-import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.JsonArrayRequest;
 import com.android.volley.toolbox.Volley;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -65,6 +64,7 @@ public class LiveCgmActivity extends AppCompatActivity {
         requestQueue = Volley.newRequestQueue(LiveCgmActivity.this);
 
         settingsButton.setOnClickListener(v -> {
+            // Make sure your Settings activity class is named SettingsActivity
             Intent intent = new Intent(LiveCgmActivity.this, Settings.class);
             startActivity(intent);
         });
@@ -81,101 +81,89 @@ public class LiveCgmActivity extends AppCompatActivity {
         String highSgvString = sharedPreferences.getString(MainActivity.KEY_HIGH_SGV, "180");
 
         if (nightscoutUrl.isEmpty()) {
-            Toast.makeText(this, "Nightscout URL not set", Toast.LENGTH_SHORT).show();
+            cgmValueTextView.setText("URL?");
+            Toast.makeText(this, "Nightscout URL not set in settings", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        int lowSgv = 70;
-        int highSgv = 180;
-        try {
-            lowSgv = Integer.parseInt(lowSgvString);
-            highSgv = Integer.parseInt(highSgvString);
-        } catch (NumberFormatException e) {
-            Log.e("LiveCgmActivity", "Invalid SGV values in SharedPreferences", e);
+        // --- Corrected URL and API Logic ---
+        // Ensure URL is correctly formatted with a trailing slash
+        if (!nightscoutUrl.endsWith("/")) {
+            nightscoutUrl += "/";
         }
 
-        String apiUrl = nightscoutUrl + "/api/v1/entries?count=1&token=" + accessToken;
+        // Construct the base API URL
+        String apiUrl = nightscoutUrl + "api/v1/entries.json?count=1";
 
-        int finalLowSgv = lowSgv;
-        int finalHighSgv = highSgv;
-        StringRequest request = new StringRequest(Request.Method.GET, apiUrl,
-                new Response.Listener<String>() {
-                    @Override
-                    public void onResponse(String response) {
-                        try {
-                            if (response != null && !response.trim().isEmpty()) {
-                                String[] lines = response.split("\n");
-                                if (lines.length > 0) {
-                                    String[] parts = lines[0].split("\t");
+        // Append the access token if it exists (for token-based authentication)
+        if (!accessToken.isEmpty()) {
+            apiUrl += "&token=" + accessToken;
+        }
 
-                                    if (parts.length >= 4) {
-                                        int sgv = Integer.parseInt(parts[2]);
-                                        String direction = parts[3].replace("\"", "");
+        Log.d("LiveCgmActivity", "Fetching data from: " + apiUrl);
 
-                                        cgmValueTextView.setText(String.valueOf(sgv));
-                                        cgmTrendTextView.setText(getTrendArrow(direction));
+        int finalLowSgv = Integer.parseInt(lowSgvString);
+        int finalHighSgv = Integer.parseInt(highSgvString);
 
-                                        if (sgv < finalLowSgv || sgv > finalHighSgv) {
-                                            cgmValueTextView.setTextColor(Color.RED);
-                                        } else {
-                                            cgmValueTextView.setTextColor(Color.BLACK);
-                                        }
+        // --- FIX: Use JsonArrayRequest for a JSON API, not StringRequest ---
+        JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, apiUrl, null,
+                response -> {
+                    try {
+                        if (response.length() > 0) {
+                            JSONObject entry = response.getJSONObject(0);
+                            int sgv = entry.getInt("sgv");
+                            String direction = entry.getString("direction");
 
-                                    } else {
-                                        Log.w("LiveCgmActivity", "Unexpected data format: " + lines[0]);
-                                        cgmValueTextView.setText("Fmt");
-                                    }
-                                }
+                            cgmValueTextView.setText(String.valueOf(sgv));
+                            cgmTrendTextView.setText(getTrendArrow(direction));
+
+                            // Set text color based on SGV range
+                            if (sgv < finalLowSgv || sgv > finalHighSgv) {
+                                cgmValueTextView.setTextColor(Color.RED);
                             } else {
-                                Log.w("LiveCgmActivity", "API returned an empty response.");
-                                cgmValueTextView.setText("N/A");
+                                // FIX: Use a visible color for the "in-range" state
+                                cgmValueTextView.setTextColor(Color.BLACK);
                             }
-                        } catch (Exception e) {
-                            Log.e("LiveCgmActivity", "Error parsing string response", e);
-                            Toast.makeText(LiveCgmActivity.this, "Error parsing data", Toast.LENGTH_SHORT).show();
-                            cgmValueTextView.setText("Err");
+                        } else {
+                            Log.w("LiveCgmActivity", "API returned an empty array.");
+                            cgmValueTextView.setText("N/A");
                         }
+                    } catch (JSONException e) {
+                        Log.e("LiveCgmActivity", "Error parsing JSON response", e);
+                        cgmValueTextView.setText("Err");
                     }
                 },
-                new Response.ErrorListener() {
-                    @Override
-                    public void onErrorResponse(VolleyError error) {
+                error -> {
                     Log.e("LiveCgmActivity", "Volley request failed: " + error.toString());
-                    Toast.makeText(LiveCgmActivity.this, "Failed to fetch data", Toast.LENGTH_SHORT).show();
                     cgmValueTextView.setText("---");
                     cgmTrendTextView.setText("X");
-                }}) {
+                    Toast.makeText(LiveCgmActivity.this, "Failed to fetch data", Toast.LENGTH_SHORT).show();
+                }) {
             @Override
-            public Map<String, String> getHeaders() throws AuthFailureError {
+            public Map<String, String> getHeaders() {
                 Map<String, String> headers = new HashMap<>();
-                headers.put("api-secret", apiToken);
+                // Add the API Secret as a header if it exists. This is common for modern Nightscout setups.
+                if (!apiToken.isEmpty()) {
+                    headers.put("api-secret", apiToken);
+                }
                 return headers;
             }
         };
 
-        request.setRetryPolicy(new DefaultRetryPolicy(10000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES,DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
         requestQueue.add(request);
     }
 
     private String getTrendArrow(String trendString) {
         if (trendString == null) return "?";
         switch (trendString) {
-            case "DoubleUp":
-                return "↑↑";
-            case "SingleUp":
-                return "↑";
-            case "FortyFiveUp":
-                return "↗";
-            case "Flat":
-                return "→";
-            case "FortyFiveDown":
-                return "↘";
-            case "SingleDown":
-                return "↓";
-            case "DoubleDown":
-                return "↓↓";
-            default:
-                return "?";
+            case "DoubleUp": return "↑↑";
+            case "SingleUp": return "↑";
+            case "FortyFiveUp": return "↗";
+            case "Flat": return "→";
+            case "FortyFiveDown": return "↘";
+            case "SingleDown": return "↓";
+            case "DoubleDown": return "↓↓";
+            default: return "?";
         }
     }
 
