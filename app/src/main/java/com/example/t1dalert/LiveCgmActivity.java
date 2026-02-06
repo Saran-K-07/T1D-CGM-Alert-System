@@ -18,14 +18,16 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.android.volley.AuthFailureError;
+import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
-import com.android.volley.toolbox.JsonArrayRequest;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
+import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -86,70 +88,67 @@ public class LiveCgmActivity extends AppCompatActivity {
             return;
         }
 
-        // --- Corrected URL and API Logic ---
-        // Ensure URL is correctly formatted with a trailing slash
-        if (!nightscoutUrl.endsWith("/")) {
-            nightscoutUrl += "/";
+        if(nightscoutUrl.startsWith("http://")){
+            nightscoutUrl = "http://" + URLEncoder.encode(apiToken) + "@" + nightscoutUrl.substring(7);
+        }
+        if(nightscoutUrl.startsWith("https://")){
+            nightscoutUrl = "https://" + URLEncoder.encode(apiToken) + "@" + nightscoutUrl.substring(8);
         }
 
-        // Construct the base API URL
-        String apiUrl = nightscoutUrl + "api/v1/entries.json?count=1";
-
-        // Append the access token if it exists (for token-based authentication)
-        if (!accessToken.isEmpty()) {
-            apiUrl += "&token=" + accessToken;
-        }
-
-        Log.d("LiveCgmActivity", "Fetching data from: " + apiUrl);
+        String apiUrl = nightscoutUrl + "/api/v1/entries?token=" + accessToken + "&count=1";
+        Log.d("LiveCGMActivity",apiUrl);
 
         int finalLowSgv = Integer.parseInt(lowSgvString);
         int finalHighSgv = Integer.parseInt(highSgvString);
+        StringRequest request = new StringRequest(Request.Method.GET, apiUrl,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        try {
+                            if (response != null && !response.trim().isEmpty()) {
+                                String[] lines = response.split("\n");
+                                if (lines.length > 0) {
+                                    String[] parts = lines[0].split("\t");
 
-        // --- FIX: Use JsonArrayRequest for a JSON API, not StringRequest ---
-        JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, apiUrl, null,
-                response -> {
-                    try {
-                        if (response.length() > 0) {
-                            JSONObject entry = response.getJSONObject(0);
-                            int sgv = entry.getInt("sgv");
-                            String direction = entry.getString("direction");
+                                    if (parts.length >= 4) {
+                                        int sgv = Integer.parseInt(parts[2]);
+                                        String direction = parts[3].replace("\"", "");
 
-                            cgmValueTextView.setText(String.valueOf(sgv));
-                            cgmTrendTextView.setText(getTrendArrow(direction));
+                                        cgmValueTextView.setText(String.valueOf(sgv));
+                                        cgmTrendTextView.setText(getTrendArrow(direction));
 
-                            // Set text color based on SGV range
-                            if (sgv < finalLowSgv || sgv > finalHighSgv) {
-                                cgmValueTextView.setTextColor(Color.RED);
+                                        if (sgv < finalLowSgv || sgv > finalHighSgv) {
+                                            cgmValueTextView.setTextColor(Color.RED);
+                                        } else {
+                                            cgmValueTextView.setTextColor(Color.BLACK);
+                                        }
+
+                                    } else {
+                                        Log.w("LiveCgmActivity", "Unexpected data format: " + lines[0]);
+                                        cgmValueTextView.setText("Fmt");
+                                    }
+                                }
                             } else {
-                                // FIX: Use a visible color for the "in-range" state
-                                cgmValueTextView.setTextColor(Color.BLACK);
+                                Log.w("LiveCgmActivity", "API returned an empty response.");
+                                cgmValueTextView.setText("N/A");
                             }
-                        } else {
-                            Log.w("LiveCgmActivity", "API returned an empty array.");
-                            cgmValueTextView.setText("N/A");
+                        } catch (Exception e) {
+                            Log.e("LiveCgmActivity", "Error parsing string response", e);
+                            Toast.makeText(LiveCgmActivity.this, "Error parsing data", Toast.LENGTH_SHORT).show();
+                            cgmValueTextView.setText("Err");
                         }
-                    } catch (JSONException e) {
-                        Log.e("LiveCgmActivity", "Error parsing JSON response", e);
-                        cgmValueTextView.setText("Err");
                     }
                 },
-                error -> {
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
                     Log.e("LiveCgmActivity", "Volley request failed: " + error.toString());
+                    Toast.makeText(LiveCgmActivity.this, "Failed to fetch data", Toast.LENGTH_SHORT).show();
                     cgmValueTextView.setText("---");
                     cgmTrendTextView.setText("X");
-                    Toast.makeText(LiveCgmActivity.this, "Failed to fetch data", Toast.LENGTH_SHORT).show();
-                }) {
-            @Override
-            public Map<String, String> getHeaders() {
-                Map<String, String> headers = new HashMap<>();
-                // Add the API Secret as a header if it exists. This is common for modern Nightscout setups.
-                if (!apiToken.isEmpty()) {
-                    headers.put("api-secret", apiToken);
-                }
-                return headers;
-            }
-        };
+                }});
 
+        request.setRetryPolicy(new DefaultRetryPolicy(10000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES,DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
         requestQueue.add(request);
     }
 
