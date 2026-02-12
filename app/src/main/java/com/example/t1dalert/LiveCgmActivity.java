@@ -43,7 +43,7 @@ public class LiveCgmActivity extends AppCompatActivity {
         @Override
         public void run() {
             fetchCgmData();
-            final int REFRESH_INTERVAL = 60000; // 1 minute
+            final int REFRESH_INTERVAL = 15000; // 15 seconds
             handler.postDelayed(this, REFRESH_INTERVAL);
         }
     };
