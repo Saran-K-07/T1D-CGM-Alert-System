@@ -1,12 +1,20 @@
 package com.example.t1dalert;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
+import android.provider.Settings;
+import android.widget.Toast;
+
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -83,7 +91,38 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show();
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 100) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startServiceAndLaunch();
+            } else {
+                Toast.makeText(this, "Notification permission required for background monitoring", Toast.LENGTH_SHORT).show();
+                startServiceAndLaunch(); // Proceed anyway, but notification may not show
+            }
+        }
+    }
+
     private void launchNextActivity() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 100);
+                return; // Wait for permission result
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+            startActivity(intent);
+            Toast.makeText(this, "Grant 'Display over other apps' permission for full-screen alerts", Toast.LENGTH_SHORT).show();
+            return; // Wait for user to grant
+        }
+        startServiceAndLaunch();
+    }
+
+    private void startServiceAndLaunch() {
+        Intent serviceIntent = new Intent(MainActivity.this, CgmBackgroundService.class);
+        startService(serviceIntent);
         Intent intent = new Intent(MainActivity.this, LiveCgmActivity.class);
         startActivity(intent);
         finish();
