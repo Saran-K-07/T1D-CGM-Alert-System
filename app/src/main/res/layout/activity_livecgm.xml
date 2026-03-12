@@ -23,7 +23,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="36sp"
-        android:textColor="@color/black"
+        android:textColor="@color/cgm_text_normal"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -35,7 +35,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:text="mg/dL"
+        android:text="@string/live_cgm_unit"
+        android:textColor="@color/cgm_text_normal"
         android:textSize="20sp"
         app:layout_constraintBaseline_toBaselineOf="@+id/cgm_value"
         app:layout_constraintStart_toEndOf="@+id/cgm_value" />
@@ -45,7 +46,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="40dp"
-        android:text="Settings"
+        android:text="@string/live_cgm_settings"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/cgm_trend" />
