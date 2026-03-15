@@ -6,7 +6,6 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -85,15 +84,13 @@ public class LiveCgmActivity extends AppCompatActivity {
         }
 
         String encodedApiToken = encodeForUrl(apiToken);
-        if(nightscoutUrl.startsWith("http://")){
+        if (nightscoutUrl.startsWith("http://")) {
             nightscoutUrl = "http://" + encodedApiToken + "@" + nightscoutUrl.substring(7);
-        }
-        if(nightscoutUrl.startsWith("https://")){
+        } else if (nightscoutUrl.startsWith("https://")) {
             nightscoutUrl = "https://" + encodedApiToken + "@" + nightscoutUrl.substring(8);
         }
 
         String apiUrl = nightscoutUrl + "/api/v1/entries?token=" + accessToken + "&count=1";
-        Log.d("LiveCGMActivity",apiUrl);
 
         int finalLowSgv = Integer.parseInt(lowSgvString);
         int finalHighSgv = Integer.parseInt(highSgvString);
@@ -119,22 +116,18 @@ public class LiveCgmActivity extends AppCompatActivity {
                                         }
 
                                     } else {
-                                        Log.w("LiveCgmActivity", "Unexpected data format: " + lines[0]);
                                         cgmValueTextView.setText(R.string.live_cgm_format_short);
                                     }
                                 }
                             } else {
-                                Log.w("LiveCgmActivity", "API returned an empty response.");
                                 cgmValueTextView.setText(R.string.live_cgm_not_available_short);
                             }
                         } catch (Exception e) {
-                            Log.e("LiveCgmActivity", "Error parsing string response", e);
                             Toast.makeText(LiveCgmActivity.this, "Error parsing data", Toast.LENGTH_SHORT).show();
                             cgmValueTextView.setText(R.string.live_cgm_error_short);
                         }
                 },
                 (VolleyError error) -> {
-                    Log.e("LiveCgmActivity", "Volley request failed: " + error.toString());
                     Toast.makeText(LiveCgmActivity.this, "Failed to fetch data", Toast.LENGTH_SHORT).show();
                     cgmValueTextView.setText(R.string.live_cgm_loading_failed_short);
                     cgmTrendTextView.setText(R.string.live_cgm_trend_unavailable_short);

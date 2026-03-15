@@ -6,11 +6,15 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -20,7 +24,17 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.EncodeHintType;
+import com.google.zxing.MultiFormatWriter;
+import com.google.zxing.common.BitMatrix;
+import com.journeyapps.barcodescanner.ScanContract;
+import com.journeyapps.barcodescanner.ScanOptions;
+
+import java.util.EnumMap;
+import java.util.Map;
 
 public class Settings extends AppCompatActivity {
 
@@ -41,9 +55,34 @@ public class Settings extends AppCompatActivity {
     private Button removeContact4Button;
     private Button removeContact5Button;
     private Button saveButton;
+    private Button showQrButton;
+    private Button scanQrButton;
 
     private static final int CONTACT_PICK_REQUEST = 1;
     private static final int READ_CONTACTS_REQUEST = 2;
+    private static final int CAMERA_PERMISSION_REQUEST = 3;
+
+    private final androidx.activity.result.ActivityResultLauncher<ScanOptions> qrScanLauncher =
+            registerForActivityResult(new ScanContract(), result -> {
+                if (result == null || result.getContents() == null || result.getContents().trim().isEmpty()) {
+                    return;
+                }
+
+                SettingsQrCodec.ParsedSettings parsed = SettingsQrCodec.fromPayload(result.getContents().trim());
+                if (parsed == null) {
+                    Toast.makeText(this, "Invalid settings QR", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                nightscoutUrlEditText.setText(parsed.nightscoutUrl);
+                apiTokenEditText.setText(parsed.apiToken);
+                accessTokenEditText.setText(parsed.accessToken);
+                lowSgvEditText.setText(parsed.lowSgv);
+                highSgvEditText.setText(parsed.highSgv);
+
+                saveSettings();
+                Toast.makeText(this, "Settings imported (contacts unchanged)", Toast.LENGTH_LONG).show();
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,6 +106,8 @@ public class Settings extends AppCompatActivity {
         removeContact4Button = findViewById(R.id.remove_contact_4);
         removeContact5Button = findViewById(R.id.remove_contact_5);
         saveButton = findViewById(R.id.save_button);
+        showQrButton = findViewById(R.id.show_qr_button);
+        scanQrButton = findViewById(R.id.scan_qr_button);
 
         loadSettings();
         updateContactDisplay();
@@ -83,6 +124,9 @@ public class Settings extends AppCompatActivity {
             saveSettings();
             finish();
         });
+
+        showQrButton.setOnClickListener(v -> showSettingsQr());
+        scanQrButton.setOnClickListener(v -> scanSettingsQr());
     }
 
     private void loadSettings() {
@@ -152,6 +196,12 @@ public class Settings extends AppCompatActivity {
             } else {
                 Toast.makeText(this, "Contacts permission required to add emergency contacts", Toast.LENGTH_SHORT).show();
             }
+        } else if (requestCode == CAMERA_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                scanSettingsQr();
+            } else {
+                Toast.makeText(this, "Camera permission required to scan QR", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -189,15 +239,10 @@ public class Settings extends AppCompatActivity {
 
     private void addContactToList(String name, String phoneNumber) {
         SharedPreferences sharedPreferences = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
-
-        // Normalize phone numbers: remove non-digits
         String normalizedPhone = phoneNumber.replaceAll("\\D", "");
 
-        String[] keys = {MainActivity.KEY_CONTACT_1, MainActivity.KEY_CONTACT_2, MainActivity.KEY_CONTACT_3, MainActivity.KEY_CONTACT_4, MainActivity.KEY_CONTACT_5};
-
-        // Check for duplicates
-        for (int i = 0; i < keys.length; i++) {
-            String existingPhone = sharedPreferences.getString(keys[i], "");
+        for (String key : MainActivity.CONTACT_KEYS) {
+            String existingPhone = sharedPreferences.getString(key, "");
             String normalizedExisting = existingPhone.replaceAll("\\D", "");
             if (normalizedExisting.equals(normalizedPhone)) {
                 Toast.makeText(this, "Contact already added", Toast.LENGTH_SHORT).show();
@@ -206,12 +251,10 @@ public class Settings extends AppCompatActivity {
         }
 
         SharedPreferences.Editor editor = sharedPreferences.edit();
-        String[] nameKeys = {MainActivity.KEY_CONTACT_1_NAME, MainActivity.KEY_CONTACT_2_NAME, MainActivity.KEY_CONTACT_3_NAME, MainActivity.KEY_CONTACT_4_NAME, MainActivity.KEY_CONTACT_5_NAME};
-
-        for (int i = 0; i < keys.length; i++) {
-            if (sharedPreferences.getString(keys[i], "").isEmpty()) {
-                editor.putString(keys[i], phoneNumber);
-                editor.putString(nameKeys[i], name);
+        for (int i = 0; i < MainActivity.CONTACT_KEYS.length; i++) {
+            if (sharedPreferences.getString(MainActivity.CONTACT_KEYS[i], "").isEmpty()) {
+                editor.putString(MainActivity.CONTACT_KEYS[i], phoneNumber);
+                editor.putString(MainActivity.CONTACT_NAME_KEYS[i], name);
                 editor.apply();
                 updateContactDisplay();
                 Toast.makeText(this, "Contact added", Toast.LENGTH_SHORT).show();
@@ -225,11 +268,8 @@ public class Settings extends AppCompatActivity {
         SharedPreferences sharedPreferences = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
 
-        String[] keys = {MainActivity.KEY_CONTACT_1, MainActivity.KEY_CONTACT_2, MainActivity.KEY_CONTACT_3, MainActivity.KEY_CONTACT_4, MainActivity.KEY_CONTACT_5};
-        String[] nameKeys = {MainActivity.KEY_CONTACT_1_NAME, MainActivity.KEY_CONTACT_2_NAME, MainActivity.KEY_CONTACT_3_NAME, MainActivity.KEY_CONTACT_4_NAME, MainActivity.KEY_CONTACT_5_NAME};
-
-        editor.putString(keys[index], "");
-        editor.putString(nameKeys[index], "");
+        editor.putString(MainActivity.CONTACT_KEYS[index], "");
+        editor.putString(MainActivity.CONTACT_NAME_KEYS[index], "");
         editor.apply();
 
         updateContactDisplay();
@@ -238,12 +278,11 @@ public class Settings extends AppCompatActivity {
 
     private void updateContactDisplay() {
         SharedPreferences sharedPreferences = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
-        String[] nameKeys = {MainActivity.KEY_CONTACT_1_NAME, MainActivity.KEY_CONTACT_2_NAME, MainActivity.KEY_CONTACT_3_NAME, MainActivity.KEY_CONTACT_4_NAME, MainActivity.KEY_CONTACT_5_NAME};
         TextView[] textViews = {contact1TextView, contact2TextView, contact3TextView, contact4TextView, contact5TextView};
         Button[] buttons = {removeContact1Button, removeContact2Button, removeContact3Button, removeContact4Button, removeContact5Button};
 
-        for (int i = 0; i < nameKeys.length; i++) {
-            String name = sharedPreferences.getString(nameKeys[i], "");
+        for (int i = 0; i < MainActivity.CONTACT_NAME_KEYS.length; i++) {
+            String name = sharedPreferences.getString(MainActivity.CONTACT_NAME_KEYS[i], "");
             if (name.isEmpty()) {
                 textViews[i].setText("Not selected");
                 buttons[i].setVisibility(View.GONE);
@@ -252,5 +291,76 @@ public class Settings extends AppCompatActivity {
                 buttons[i].setVisibility(View.VISIBLE);
             }
         }
+    }
+
+    private void showSettingsQr() {
+        String payload = SettingsQrCodec.toPayload(
+                textOf(nightscoutUrlEditText),
+                textOf(apiTokenEditText),
+                textOf(accessTokenEditText),
+                textOf(lowSgvEditText),
+                textOf(highSgvEditText)
+        );
+
+        Bitmap qrBitmap = generateQrBitmap(payload, 900);
+        if (qrBitmap == null) {
+            Toast.makeText(this, "Unable to generate QR", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        ImageView imageView = new ImageView(this);
+        imageView.setImageBitmap(qrBitmap);
+        imageView.setAdjustViewBounds(true);
+
+        LinearLayout container = new LinearLayout(this);
+        container.setPadding(32, 24, 32, 8);
+        container.setGravity(Gravity.CENTER);
+        container.addView(imageView, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Settings QR")
+                .setMessage("Includes Nightscout settings only. Contacts are excluded.")
+                .setView(container)
+                .setPositiveButton("Close", null)
+                .show();
+    }
+
+    private void scanSettingsQr() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
+            return;
+        }
+
+        ScanOptions options = new ScanOptions();
+        options.setPrompt("Scan settings QR");
+        options.setBeepEnabled(true);
+        options.setOrientationLocked(false);
+        options.setDesiredBarcodeFormats(ScanOptions.QR_CODE);
+        qrScanLauncher.launch(options);
+    }
+
+    private Bitmap generateQrBitmap(String text, int sizePx) {
+        try {
+            Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
+            hints.put(EncodeHintType.MARGIN, 1);
+            BitMatrix matrix = new MultiFormatWriter().encode(text, BarcodeFormat.QR_CODE, sizePx, sizePx, hints);
+            Bitmap bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.RGB_565);
+
+            for (int y = 0; y < sizePx; y++) {
+                for (int x = 0; x < sizePx; x++) {
+                    bitmap.setPixel(x, y, matrix.get(x, y) ? 0xFF000000 : 0xFFFFFFFF);
+                }
+            }
+            return bitmap;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String textOf(TextInputEditText editText) {
+        return editText.getText() == null ? "" : editText.getText().toString().trim();
     }
 }

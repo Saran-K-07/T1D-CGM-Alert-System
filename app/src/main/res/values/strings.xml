@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">T1D Alert</string>
+    <string name="live_cgm_unit">mg/dL</string>
+    <string name="live_cgm_settings">Settings</string>
+    <string name="live_cgm_missing_url_short">URL?</string>
+    <string name="live_cgm_format_short">Fmt</string>
+    <string name="live_cgm_not_available_short">N/A</string>
+    <string name="live_cgm_error_short">Err</string>
+    <string name="live_cgm_loading_failed_short">---</string>
+    <string name="live_cgm_trend_unavailable_short">X</string>
 </resources>

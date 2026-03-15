@@ -8,7 +8,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.util.Log;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -43,12 +42,31 @@ public class MainActivity extends AppCompatActivity {
     public static final String KEY_CONTACT_3_NAME = "contact_3_name";
     public static final String KEY_CONTACT_4_NAME = "contact_4_name";
     public static final String KEY_CONTACT_5_NAME = "contact_5_name";
+    public static final String[] CONTACT_KEYS = {
+            KEY_CONTACT_1,
+            KEY_CONTACT_2,
+            KEY_CONTACT_3,
+            KEY_CONTACT_4,
+            KEY_CONTACT_5
+    };
+    public static final String[] CONTACT_NAME_KEYS = {
+            KEY_CONTACT_1_NAME,
+            KEY_CONTACT_2_NAME,
+            KEY_CONTACT_3_NAME,
+            KEY_CONTACT_4_NAME,
+            KEY_CONTACT_5_NAME
+    };
     public static final String KEY_LOW_ALERT_START_TIME = "low_alert_start_time";
     public static final String KEY_OVERLAY_ACTIVE = "overlay_active";
     public static final String KEY_SMS_SENT = "sms_sent";
     public static final String KEY_LAST_ALERTED_SGV = "last_alerted_sgv";
     public static final String KEY_FALL_DETECTED = "fall_detected";
     public static final String KEY_FALL_DETECTED_AT = "fall_detected_at";
+    public static final String KEY_UNCONSCIOUS_LIKELY = "unconscious_likely";
+    public static final String KEY_UNCONSCIOUS_CONFIDENCE = "unconscious_confidence";
+    public static final String KEY_UNCONSCIOUS_TELEMETRY = "unconscious_telemetry";
+    public static final String KEY_LAST_LOCATION = "last_location";
+    public static final String KEY_LAST_LOCATION_AT = "last_location_at";
 
     private TextInputEditText nightscoutUrlEditText;
     private TextInputEditText apiTokenEditText;
@@ -115,15 +133,13 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Grant 'Do Not Disturb access' in Settings > Sound > Do Not Disturb > Allow exceptions > Apps > T1DAlert for reliable alarms", Toast.LENGTH_LONG).show();
             Intent intent = new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
             startActivity(intent);
-        } else {
-            Log.d("MainActivity", "DND access granted");
         }
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == 100 || requestCode == 101 || requestCode == 102) {
+        if (requestCode == 100 || requestCode == 101 || requestCode == 102 || requestCode == 103 || requestCode == 104) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 launchNextActivity();
             } else {
@@ -143,6 +159,15 @@ public class MainActivity extends AppCompatActivity {
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS}, 102);
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECEIVE_SMS}, 104);
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 103);
             return;
         }
         if (!Settings.canDrawOverlays(this)) {
