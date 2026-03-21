@@ -1,98 +1,161 @@
 package com.example.t1dalert;
 
-import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Base64;
+
+import org.json.JSONObject;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.security.MessageDigest;
-import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
-import java.util.Arrays;
 
-import javax.crypto.Cipher;
-import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 public final class SecureAlertMessageCodec {
 
-    private static final String KEY_ALERT_ENCRYPTION_SECRET = "alert_encryption_secret";
-    private static final String AES_TRANSFORMATION = "AES/GCM/NoPadding";
-    private static final int GCM_TAG_LENGTH_BITS = 128;
-    private static final int IV_LENGTH_BYTES = 12;
-    private static final int KEY_LENGTH_BYTES = 32;
+    private static final String VERSION = "2";
+    private static final String PREFIX = "ALRTv2:";
 
     private SecureAlertMessageCodec() {
     }
 
-    public static String encrypt(Context context, SharedPreferences sharedPreferences, String plainMessage) {
-        if (plainMessage == null || plainMessage.isEmpty()) {
-            return plainMessage == null ? "" : plainMessage;
+    public static String encrypt(SharedPreferences sharedPreferences, String plainMessage) {
+        String sharedKey = AlertKeyManager.getOrCreateSharedAlertKey(sharedPreferences);
+        return encryptWithSharedKey(sharedKey, plainMessage);
+    }
+
+    public static DecodeResult decrypt(SharedPreferences sharedPreferences, String message) {
+        if (message == null || message.trim().isEmpty()) {
+            return DecodeResult.invalid("empty_message");
+        }
+
+        if (!message.startsWith(PREFIX)) {
+            return DecodeResult.plain(message);
+        }
+
+        String sharedKey = AlertKeyManager.getOrCreateSharedAlertKey(sharedPreferences);
+        return decryptWithSharedKey(sharedKey, message);
+    }
+
+    static String encryptWithSharedKey(String sharedKey, String plainMessage) {
+        if (plainMessage == null || plainMessage.trim().isEmpty()) {
+            return "";
+        }
+
+        if (sharedKey.isEmpty()) {
+            return plainMessage;
         }
 
         try {
-            SecretKeySpec key = new SecretKeySpec(getOrCreateSecret(sharedPreferences), "AES");
-            byte[] iv = new byte[IV_LENGTH_BYTES];
-            new SecureRandom().nextBytes(iv);
+            byte[] keyBytes = deriveKey(sharedKey);
+            byte[] nonce = new byte[12];
+            new SecureRandom().nextBytes(nonce);
+            String nonceB64 = Base64.getEncoder().withoutPadding().encodeToString(nonce);
+            String payloadB64 = Base64.getEncoder().withoutPadding().encodeToString(plainMessage.getBytes(StandardCharsets.UTF_8));
 
-            Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
-            cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv));
-            byte[] cipherText = cipher.doFinal(plainMessage.getBytes(StandardCharsets.UTF_8));
+            String signingInput = VERSION + "." + nonceB64 + "." + payloadB64;
+            String hmacB64 = Base64.getEncoder().withoutPadding().encodeToString(hmacSha256(keyBytes, signingInput.getBytes(StandardCharsets.UTF_8)));
 
-            String ivEncoded = Base64.encodeToString(iv, Base64.NO_WRAP);
-            String payloadEncoded = Base64.encodeToString(cipherText, Base64.NO_WRAP);
-            return "ENCv1:" + ivEncoded + ":" + payloadEncoded;
-        } catch (GeneralSecurityException e) {
+            JSONObject envelope = new JSONObject();
+            envelope.put("v", VERSION);
+            envelope.put("n", nonceB64);
+            envelope.put("p", payloadB64);
+            envelope.put("h", hmacB64);
+            return PREFIX + envelope.toString();
+        } catch (Exception e) {
             return plainMessage;
         }
     }
 
-    public static String decrypt(SharedPreferences sharedPreferences, String encodedMessage) {
-        if (encodedMessage == null || !encodedMessage.startsWith("ENCv1:")) {
-            return encodedMessage == null ? "" : encodedMessage;
+    static DecodeResult decryptWithSharedKey(String sharedKey, String message) {
+        if (message == null || message.trim().isEmpty()) {
+            return DecodeResult.invalid("empty_message");
+        }
+
+        if (!message.startsWith(PREFIX)) {
+            return DecodeResult.plain(message);
+        }
+
+        if (sharedKey.isEmpty()) {
+            return DecodeResult.invalid("missing_shared_key");
         }
 
         try {
-            String[] parts = encodedMessage.split(":", 3);
-            if (parts.length != 3) {
-                return "";
+            JSONObject envelope = new JSONObject(message.substring(PREFIX.length()));
+            String version = envelope.optString("v", "");
+            String nonceB64 = envelope.optString("n", "");
+            String payloadB64 = envelope.optString("p", "");
+            String hmacB64 = envelope.optString("h", "");
+
+            if (!VERSION.equals(version) || nonceB64.isEmpty() || payloadB64.isEmpty() || hmacB64.isEmpty()) {
+                return DecodeResult.invalid("schema_invalid");
             }
 
-            byte[] iv = Base64.decode(parts[1], Base64.NO_WRAP);
-            byte[] cipherBytes = Base64.decode(parts[2], Base64.NO_WRAP);
-            SecretKeySpec key = new SecretKeySpec(getOrCreateSecret(sharedPreferences), "AES");
+            byte[] keyBytes = deriveKey(sharedKey);
+            String signingInput = version + "." + nonceB64 + "." + payloadB64;
+            String computed = Base64.getEncoder().withoutPadding().encodeToString(hmacSha256(keyBytes, signingInput.getBytes(StandardCharsets.UTF_8)));
+            if (!constantTimeEquals(hmacB64, computed)) {
+                return DecodeResult.invalid("hmac_mismatch");
+            }
 
-            Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
-            cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv));
-            byte[] plainBytes = cipher.doFinal(cipherBytes);
-            return new String(plainBytes, StandardCharsets.UTF_8);
+            String payload = new String(Base64.getDecoder().decode(payloadB64), StandardCharsets.UTF_8);
+            return DecodeResult.secure(payload);
         } catch (Exception e) {
-            return "";
+            return DecodeResult.invalid("decode_error");
         }
     }
 
-    private static byte[] getOrCreateSecret(SharedPreferences sharedPreferences) {
-        String accessToken = sharedPreferences.getString(MainActivity.KEY_ACCESS_TOKEN, "");
-        if (accessToken != null && !accessToken.trim().isEmpty()) {
-            try {
-                MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                return Arrays.copyOf(digest.digest(accessToken.getBytes(StandardCharsets.UTF_8)), KEY_LENGTH_BYTES);
-            } catch (Exception ignored) {
-            }
+    private static byte[] deriveKey(String sharedKey) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        return digest.digest(sharedKey.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static byte[] hmacSha256(byte[] key, byte[] data) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(key, "HmacSHA256"));
+        return mac.doFinal(data);
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        byte[] ab = a.getBytes(StandardCharsets.UTF_8);
+        byte[] bb = b.getBytes(StandardCharsets.UTF_8);
+        if (ab.length != bb.length) {
+            return false;
+        }
+        int r = 0;
+        for (int i = 0; i < ab.length; i++) {
+            r |= ab[i] ^ bb[i];
+        }
+        return r == 0;
+    }
+
+    public static final class DecodeResult {
+        public final String message;
+        public final boolean isSecure;
+        public final boolean isValid;
+        public final String errorCode;
+
+        private DecodeResult(String message, boolean isSecure, boolean isValid, String errorCode) {
+            this.message = message;
+            this.isSecure = isSecure;
+            this.isValid = isValid;
+            this.errorCode = errorCode;
         }
 
-        String base64 = sharedPreferences.getString(KEY_ALERT_ENCRYPTION_SECRET, "");
-        if (base64 != null && !base64.isEmpty()) {
-            byte[] key = Base64.decode(base64, Base64.NO_WRAP);
-            if (key.length == KEY_LENGTH_BYTES) {
-                return key;
-            }
+        static DecodeResult plain(String message) {
+            return new DecodeResult(message, false, true, "");
         }
 
-        byte[] freshKey = new byte[KEY_LENGTH_BYTES];
-        new SecureRandom().nextBytes(freshKey);
-        String freshKeyEncoded = Base64.encodeToString(freshKey, Base64.NO_WRAP);
-        sharedPreferences.edit().putString(KEY_ALERT_ENCRYPTION_SECRET, freshKeyEncoded).apply();
-        return freshKey;
+        static DecodeResult secure(String message) {
+            return new DecodeResult(message, true, true, "");
+        }
+
+        static DecodeResult invalid(String errorCode) {
+            return new DecodeResult("", false, false, errorCode);
+        }
     }
 }

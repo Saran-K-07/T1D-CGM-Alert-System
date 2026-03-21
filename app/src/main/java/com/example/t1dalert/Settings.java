@@ -2,14 +2,10 @@ package com.example.t1dalert;
 
 import android.Manifest;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
 import android.graphics.Bitmap;
-import android.net.Uri;
 import android.os.Bundle;
-import android.provider.ContactsContract;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -19,7 +15,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -43,7 +38,7 @@ public class Settings extends AppCompatActivity {
     private TextInputEditText accessTokenEditText;
     private TextInputEditText lowSgvEditText;
     private TextInputEditText highSgvEditText;
-    private Button addContactButton;
+    private TextInputEditText escalationNumberEditText;
     private TextView contact1TextView;
     private TextView contact2TextView;
     private TextView contact3TextView;
@@ -55,12 +50,13 @@ public class Settings extends AppCompatActivity {
     private Button removeContact4Button;
     private Button removeContact5Button;
     private Button saveButton;
-    private Button showQrButton;
-    private Button scanQrButton;
+    private Button showSettingsQrButton;
+    private Button scanSettingsQrButton;
+    private Button showContactsQrButton;
+    private Button scanContactsQrButton;
 
-    private static final int CONTACT_PICK_REQUEST = 1;
-    private static final int READ_CONTACTS_REQUEST = 2;
-    private static final int CAMERA_PERMISSION_REQUEST = 3;
+    private static final int CAMERA_PERMISSION_REQUEST = AppConfig.REQUEST_CAMERA;
+    private int pendingScanPromptRes = R.string.scan_settings_qr_prompt;
 
     private final androidx.activity.result.ActivityResultLauncher<ScanOptions> qrScanLauncher =
             registerForActivityResult(new ScanContract(), result -> {
@@ -68,20 +64,23 @@ public class Settings extends AppCompatActivity {
                     return;
                 }
 
-                SettingsQrCodec.ParsedSettings parsed = SettingsQrCodec.fromPayload(result.getContents().trim());
-                if (parsed == null) {
-                    Toast.makeText(this, "Invalid settings QR", Toast.LENGTH_SHORT).show();
+                String scanned = result.getContents().trim();
+
+                SettingsQrCodec.ParsedSettings parsedSettings = SettingsQrCodec.fromPayload(scanned);
+                if (parsedSettings != null) {
+                    applyScannedSettings(parsedSettings);
                     return;
                 }
 
-                nightscoutUrlEditText.setText(parsed.nightscoutUrl);
-                apiTokenEditText.setText(parsed.apiToken);
-                accessTokenEditText.setText(parsed.accessToken);
-                lowSgvEditText.setText(parsed.lowSgv);
-                highSgvEditText.setText(parsed.highSgv);
+                ContactShareQrCodec.ParsedContactShare parsedContactShare = ContactShareQrCodec.fromPayload(scanned);
+                if (parsedContactShare != null) {
+                    applyScannedContactShare(parsedContactShare);
+                    return;
+                }
 
-                saveSettings();
-                Toast.makeText(this, "Settings imported (contacts unchanged)", Toast.LENGTH_LONG).show();
+                {
+                    Toast.makeText(this, R.string.invalid_settings_qr, Toast.LENGTH_SHORT).show();
+                }
             });
 
     @Override
@@ -94,7 +93,7 @@ public class Settings extends AppCompatActivity {
         accessTokenEditText = findViewById(R.id.access_token);
         lowSgvEditText = findViewById(R.id.low_sgv);
         highSgvEditText = findViewById(R.id.high_sgv);
-        addContactButton = findViewById(R.id.add_contact_button);
+        escalationNumberEditText = findViewById(R.id.escalation_number);
         contact1TextView = findViewById(R.id.contact_1_text);
         contact2TextView = findViewById(R.id.contact_2_text);
         contact3TextView = findViewById(R.id.contact_3_text);
@@ -106,13 +105,13 @@ public class Settings extends AppCompatActivity {
         removeContact4Button = findViewById(R.id.remove_contact_4);
         removeContact5Button = findViewById(R.id.remove_contact_5);
         saveButton = findViewById(R.id.save_button);
-        showQrButton = findViewById(R.id.show_qr_button);
-        scanQrButton = findViewById(R.id.scan_qr_button);
+        showSettingsQrButton = findViewById(R.id.show_settings_qr_button);
+        scanSettingsQrButton = findViewById(R.id.scan_settings_qr_button);
+        showContactsQrButton = findViewById(R.id.show_contacts_qr_button);
+        scanContactsQrButton = findViewById(R.id.scan_contacts_qr_button);
 
         loadSettings();
         updateContactDisplay();
-
-        addContactButton.setOnClickListener(v -> addContact());
 
         removeContact1Button.setOnClickListener(v -> removeContact(0));
         removeContact2Button.setOnClickListener(v -> removeContact(1));
@@ -125,27 +124,32 @@ public class Settings extends AppCompatActivity {
             finish();
         });
 
-        showQrButton.setOnClickListener(v -> showSettingsQr());
-        scanQrButton.setOnClickListener(v -> scanSettingsQr());
+        showSettingsQrButton.setOnClickListener(v -> showSettingsQr());
+        scanSettingsQrButton.setOnClickListener(v -> scanQr(R.string.scan_settings_qr_prompt));
+        showContactsQrButton.setOnClickListener(v -> showContactsQr());
+        scanContactsQrButton.setOnClickListener(v -> scanQr(R.string.scan_contacts_qr_prompt));
     }
 
     private void loadSettings() {
-        SharedPreferences sharedPreferences = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
-        String nightscoutUrl = sharedPreferences.getString(MainActivity.KEY_NIGHTSCOUT_URL, "");
-        String apiToken = sharedPreferences.getString(MainActivity.KEY_API_TOKEN, "");
-        String accessToken = sharedPreferences.getString(MainActivity.KEY_ACCESS_TOKEN, "");
-        String lowSgv = sharedPreferences.getString(MainActivity.KEY_LOW_SGV, "70");
-        String highSgv = sharedPreferences.getString(MainActivity.KEY_HIGH_SGV, "180");
+        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        AlertKeyManager.getOrCreateSharedAlertKey(sharedPreferences);
+        String nightscoutUrl = sharedPreferences.getString(AppPrefs.KEY_NIGHTSCOUT_URL, "");
+        String apiToken = sharedPreferences.getString(AppPrefs.KEY_API_TOKEN, "");
+        String accessToken = sharedPreferences.getString(AppPrefs.KEY_ACCESS_TOKEN, "");
+        String lowSgv = sharedPreferences.getString(AppPrefs.KEY_LOW_SGV, String.valueOf(AppConfig.DEFAULT_LOW_SGV));
+        String highSgv = sharedPreferences.getString(AppPrefs.KEY_HIGH_SGV, String.valueOf(AppConfig.DEFAULT_HIGH_SGV));
+        String escalationNumber = sharedPreferences.getString(AppPrefs.KEY_ESCALATION_NUMBER, "");
 
         nightscoutUrlEditText.setText(nightscoutUrl);
         apiTokenEditText.setText(apiToken);
         accessTokenEditText.setText(accessToken);
         lowSgvEditText.setText(lowSgv);
         highSgvEditText.setText(highSgv);
+        escalationNumberEditText.setText(escalationNumber);
     }
 
     private void saveSettings() {
-        SharedPreferences sharedPreferences = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
 
         String nightscoutUrl = nightscoutUrlEditText.getText().toString().trim();
@@ -153,138 +157,53 @@ public class Settings extends AppCompatActivity {
         String accessToken = accessTokenEditText.getText().toString().trim();
         String lowSgvString = lowSgvEditText.getText().toString().trim();
         String highSgvString = highSgvEditText.getText().toString().trim();
+        String escalationNumber = textOf(escalationNumberEditText);
 
-        editor.putString(MainActivity.KEY_NIGHTSCOUT_URL, nightscoutUrl);
-        editor.putString(MainActivity.KEY_API_TOKEN, apiToken);
-        editor.putString(MainActivity.KEY_ACCESS_TOKEN, accessToken);
-        editor.putString(MainActivity.KEY_LOW_SGV, lowSgvString);
-        editor.putString(MainActivity.KEY_HIGH_SGV, highSgvString);
+        editor.putString(AppPrefs.KEY_NIGHTSCOUT_URL, nightscoutUrl);
+        editor.putString(AppPrefs.KEY_API_TOKEN, apiToken);
+        editor.putString(AppPrefs.KEY_ACCESS_TOKEN, accessToken);
+        editor.putString(AppPrefs.KEY_LOW_SGV, lowSgvString);
+        editor.putString(AppPrefs.KEY_HIGH_SGV, highSgvString);
+        editor.putString(AppPrefs.KEY_ESCALATION_NUMBER, escalationNumber);
 
         editor.apply();
 
-        Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show();
-    }
-
-    private void addContact() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_CONTACTS}, READ_CONTACTS_REQUEST);
-        } else {
-            pickContact();
-        }
-    }
-
-    private void pickContact() {
-        Intent intent = new Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI);
-        startActivityForResult(intent, CONTACT_PICK_REQUEST);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == CONTACT_PICK_REQUEST && resultCode == RESULT_OK && data != null) {
-            Uri contactUri = data.getData();
-            getContactDetails(contactUri);
-        }
+        Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == READ_CONTACTS_REQUEST) {
+        if (requestCode == CAMERA_PERMISSION_REQUEST) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                pickContact();
+                scanQr(pendingScanPromptRes);
             } else {
-                Toast.makeText(this, "Contacts permission required to add emergency contacts", Toast.LENGTH_SHORT).show();
-            }
-        } else if (requestCode == CAMERA_PERMISSION_REQUEST) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                scanSettingsQr();
-            } else {
-                Toast.makeText(this, "Camera permission required to scan QR", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.camera_permission_required, Toast.LENGTH_SHORT).show();
             }
         }
-    }
-
-    private void getContactDetails(Uri contactUri) {
-        Cursor cursor = getContentResolver().query(contactUri, null, null, null, null);
-        if (cursor != null && cursor.moveToFirst()) {
-            int idIndex = cursor.getColumnIndex(ContactsContract.Contacts._ID);
-            if (idIndex >= 0) {
-                String contactId = cursor.getString(idIndex);
-                int nameIndex = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME);
-                String name = nameIndex >= 0 ? cursor.getString(nameIndex) : "Unknown";
-                cursor.close();
-
-                Cursor phoneCursor = getContentResolver().query(
-                    ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                    null,
-                    ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
-                    new String[]{contactId},
-                    null
-                );
-
-                if (phoneCursor != null && phoneCursor.moveToFirst()) {
-                    int phoneIndex = phoneCursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER);
-                    if (phoneIndex >= 0) {
-                        String phoneNumber = phoneCursor.getString(phoneIndex);
-                        addContactToList(name, phoneNumber);
-                    }
-                    phoneCursor.close();
-                }
-            } else {
-                cursor.close();
-            }
-        }
-    }
-
-    private void addContactToList(String name, String phoneNumber) {
-        SharedPreferences sharedPreferences = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
-        String normalizedPhone = phoneNumber.replaceAll("\\D", "");
-
-        for (String key : MainActivity.CONTACT_KEYS) {
-            String existingPhone = sharedPreferences.getString(key, "");
-            String normalizedExisting = existingPhone.replaceAll("\\D", "");
-            if (normalizedExisting.equals(normalizedPhone)) {
-                Toast.makeText(this, "Contact already added", Toast.LENGTH_SHORT).show();
-                return;
-            }
-        }
-
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        for (int i = 0; i < MainActivity.CONTACT_KEYS.length; i++) {
-            if (sharedPreferences.getString(MainActivity.CONTACT_KEYS[i], "").isEmpty()) {
-                editor.putString(MainActivity.CONTACT_KEYS[i], phoneNumber);
-                editor.putString(MainActivity.CONTACT_NAME_KEYS[i], name);
-                editor.apply();
-                updateContactDisplay();
-                Toast.makeText(this, "Contact added", Toast.LENGTH_SHORT).show();
-                return;
-            }
-        }
-        Toast.makeText(this, "Maximum 5 contacts allowed", Toast.LENGTH_SHORT).show();
     }
 
     private void removeContact(int index) {
-        SharedPreferences sharedPreferences = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
 
-        editor.putString(MainActivity.CONTACT_KEYS[index], "");
-        editor.putString(MainActivity.CONTACT_NAME_KEYS[index], "");
+        editor.putString(AppPrefs.CONTACT_KEYS[index], "");
+        editor.putString(AppPrefs.CONTACT_NAME_KEYS[index], "");
         editor.apply();
 
         updateContactDisplay();
-        Toast.makeText(this, "Contact removed", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, R.string.contact_removed, Toast.LENGTH_SHORT).show();
     }
 
     private void updateContactDisplay() {
-        SharedPreferences sharedPreferences = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
         TextView[] textViews = {contact1TextView, contact2TextView, contact3TextView, contact4TextView, contact5TextView};
         Button[] buttons = {removeContact1Button, removeContact2Button, removeContact3Button, removeContact4Button, removeContact5Button};
 
-        for (int i = 0; i < MainActivity.CONTACT_NAME_KEYS.length; i++) {
-            String name = sharedPreferences.getString(MainActivity.CONTACT_NAME_KEYS[i], "");
-            if (name.isEmpty()) {
-                textViews[i].setText("Not selected");
+        for (int i = 0; i < AppPrefs.CONTACT_NAME_KEYS.length; i++) {
+            String name = sharedPreferences.getString(AppPrefs.CONTACT_NAME_KEYS[i], "");
+            if (name == null || name.isEmpty()) {
+                textViews[i].setText(R.string.contact_not_selected);
                 buttons[i].setVisibility(View.GONE);
             } else {
                 textViews[i].setText(name);
@@ -294,17 +213,31 @@ public class Settings extends AppCompatActivity {
     }
 
     private void showSettingsQr() {
-        String payload = SettingsQrCodec.toPayload(
+        String payload = SettingsSyncHelper.buildSharePayload(
                 textOf(nightscoutUrlEditText),
                 textOf(apiTokenEditText),
                 textOf(accessTokenEditText),
+                AlertKeyManager.getOrCreateSharedAlertKey(getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE)),
+                textOf(escalationNumberEditText),
                 textOf(lowSgvEditText),
                 textOf(highSgvEditText)
         );
 
+        showQrDialog(payload, R.string.settings_qr_title, R.string.settings_qr_description);
+    }
+
+    private void showContactsQr() {
+        String trustedCsv = TrustedSenderMapper.buildTrustedSendersForQr(
+                getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+        );
+        String payload = ContactShareQrCodec.toPayload(trustedCsv);
+        showQrDialog(payload, R.string.contacts_qr_title, R.string.contacts_qr_description);
+    }
+
+    private void showQrDialog(String payload, int titleRes, int messageRes) {
         Bitmap qrBitmap = generateQrBitmap(payload, 900);
         if (qrBitmap == null) {
-            Toast.makeText(this, "Unable to generate QR", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.unable_generate_qr, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -321,25 +254,53 @@ public class Settings extends AppCompatActivity {
         ));
 
         new MaterialAlertDialogBuilder(this)
-                .setTitle("Settings QR")
-                .setMessage("Includes Nightscout settings only. Contacts are excluded.")
+                .setTitle(titleRes)
+                .setMessage(getString(messageRes))
                 .setView(container)
-                .setPositiveButton("Close", null)
+                .setPositiveButton(R.string.close, null)
                 .show();
     }
 
-    private void scanSettingsQr() {
+    private void scanQr(int promptRes) {
+        pendingScanPromptRes = promptRes;
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
             return;
         }
 
         ScanOptions options = new ScanOptions();
-        options.setPrompt("Scan settings QR");
+        options.setPrompt(getString(promptRes));
         options.setBeepEnabled(true);
         options.setOrientationLocked(false);
         options.setDesiredBarcodeFormats(ScanOptions.QR_CODE);
         qrScanLauncher.launch(options);
+    }
+
+    private void applyScannedSettings(SettingsQrCodec.ParsedSettings parsed) {
+        nightscoutUrlEditText.setText(parsed.nightscoutUrl);
+        apiTokenEditText.setText(parsed.apiToken);
+        accessTokenEditText.setText(parsed.accessToken);
+        escalationNumberEditText.setText(parsed.escalationNumber);
+        lowSgvEditText.setText(parsed.lowSgv);
+        highSgvEditText.setText(parsed.highSgv);
+
+        SettingsSyncHelper.applyParsedSettings(
+                getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE),
+                parsed
+        );
+        Toast.makeText(this, R.string.settings_imported, Toast.LENGTH_LONG).show();
+    }
+
+    private void applyScannedContactShare(ContactShareQrCodec.ParsedContactShare parsed) {
+        SharedPreferences prefs = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putString(AppPrefs.KEY_TRUSTED_SENDERS, parsed.trustedSenders).apply();
+
+        int addedCount = TrustedSenderMapper.addTrustedSendersToEmergencyContacts(prefs, parsed.trustedSenders);
+        updateContactDisplay();
+        Toast.makeText(this, R.string.contacts_qr_imported, Toast.LENGTH_LONG).show();
+        if (addedCount > 0) {
+            Toast.makeText(this, getString(R.string.qr_trusted_added_contacts, addedCount), Toast.LENGTH_LONG).show();
+        }
     }
 
     private Bitmap generateQrBitmap(String text, int sizePx) {
