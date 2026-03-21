@@ -26,48 +26,6 @@ import androidx.core.view.WindowInsetsCompat;
 import com.google.android.material.textfield.TextInputEditText;
 
 public class MainActivity extends AppCompatActivity {
-    public static final String PREFS_NAME = "T1DAlertPrefs";
-    public static final String KEY_NIGHTSCOUT_URL = "nightscout_url";
-    public static final String KEY_API_TOKEN = "api_token";
-    public static final String KEY_ACCESS_TOKEN = "access_token";
-    public static final String KEY_LOW_SGV = "low_sgv";
-    public static final String KEY_HIGH_SGV = "high_sgv";
-    public static final String KEY_CONTACT_1 = "contact_1";
-    public static final String KEY_CONTACT_2 = "contact_2";
-    public static final String KEY_CONTACT_3 = "contact_3";
-    public static final String KEY_CONTACT_4 = "contact_4";
-    public static final String KEY_CONTACT_5 = "contact_5";
-    public static final String KEY_CONTACT_1_NAME = "contact_1_name";
-    public static final String KEY_CONTACT_2_NAME = "contact_2_name";
-    public static final String KEY_CONTACT_3_NAME = "contact_3_name";
-    public static final String KEY_CONTACT_4_NAME = "contact_4_name";
-    public static final String KEY_CONTACT_5_NAME = "contact_5_name";
-    public static final String[] CONTACT_KEYS = {
-            KEY_CONTACT_1,
-            KEY_CONTACT_2,
-            KEY_CONTACT_3,
-            KEY_CONTACT_4,
-            KEY_CONTACT_5
-    };
-    public static final String[] CONTACT_NAME_KEYS = {
-            KEY_CONTACT_1_NAME,
-            KEY_CONTACT_2_NAME,
-            KEY_CONTACT_3_NAME,
-            KEY_CONTACT_4_NAME,
-            KEY_CONTACT_5_NAME
-    };
-    public static final String KEY_LOW_ALERT_START_TIME = "low_alert_start_time";
-    public static final String KEY_OVERLAY_ACTIVE = "overlay_active";
-    public static final String KEY_SMS_SENT = "sms_sent";
-    public static final String KEY_LAST_ALERTED_SGV = "last_alerted_sgv";
-    public static final String KEY_FALL_DETECTED = "fall_detected";
-    public static final String KEY_FALL_DETECTED_AT = "fall_detected_at";
-    public static final String KEY_UNCONSCIOUS_LIKELY = "unconscious_likely";
-    public static final String KEY_UNCONSCIOUS_CONFIDENCE = "unconscious_confidence";
-    public static final String KEY_UNCONSCIOUS_TELEMETRY = "unconscious_telemetry";
-    public static final String KEY_LAST_LOCATION = "last_location";
-    public static final String KEY_LAST_LOCATION_AT = "last_location_at";
-
     private TextInputEditText nightscoutUrlEditText;
     private TextInputEditText apiTokenEditText;
     private TextInputEditText accessTokenEditText;
@@ -76,7 +34,7 @@ public class MainActivity extends AppCompatActivity {
                 if (Settings.canDrawOverlays(this)) {
                     startServiceAndLaunch();
                 } else {
-                    Toast.makeText(this, "Overlay permission required for full-screen alerts", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, R.string.overlay_permission_required, Toast.LENGTH_SHORT).show();
                 }
             });
 
@@ -84,10 +42,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        SharedPreferences sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String url = sharedPreferences.getString(KEY_NIGHTSCOUT_URL, "");
-        String apiToken = sharedPreferences.getString(KEY_API_TOKEN, "");
-        String accessToken = sharedPreferences.getString(KEY_ACCESS_TOKEN, "");
+        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        String url = sharedPreferences.getString(AppPrefs.KEY_NIGHTSCOUT_URL, "");
+        String apiToken = sharedPreferences.getString(AppPrefs.KEY_API_TOKEN, "");
+        String accessToken = sharedPreferences.getString(AppPrefs.KEY_ACCESS_TOKEN, "");
 
         if (!url.isEmpty() && !apiToken.isEmpty() && !accessToken.isEmpty()) {
             checkDndPermission(); // Check after data is set
@@ -114,15 +72,16 @@ public class MainActivity extends AppCompatActivity {
                 String inputAccessToken = String.valueOf(accessTokenEditText.getText()).trim();
 
                 if (nightscoutUrl.isEmpty() || inputApiToken.isEmpty() || inputAccessToken.isEmpty()) {
-                    Toast.makeText(MainActivity.this, "Please fill out all fields", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, R.string.fill_all_fields, Toast.LENGTH_SHORT).show();
                     return;
                 }
                 SharedPreferences.Editor editor = sharedPreferences.edit();
-                editor.putString(KEY_NIGHTSCOUT_URL, nightscoutUrl);
-                editor.putString(KEY_API_TOKEN, inputApiToken);
-                editor.putString(KEY_ACCESS_TOKEN, inputAccessToken);
+                editor.putString(AppPrefs.KEY_NIGHTSCOUT_URL, nightscoutUrl);
+                editor.putString(AppPrefs.KEY_API_TOKEN, inputApiToken);
+                editor.putString(AppPrefs.KEY_ACCESS_TOKEN, inputAccessToken);
+                AlertKeyManager.getOrCreateSharedAlertKey(sharedPreferences);
                 editor.apply();
-                Toast.makeText(MainActivity.this, "Saved!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, R.string.saved, Toast.LENGTH_SHORT).show();
                 launchNextActivity();
         });
     }
@@ -130,7 +89,7 @@ public class MainActivity extends AppCompatActivity {
     private void checkDndPermission() {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (!nm.isNotificationPolicyAccessGranted()) {
-            Toast.makeText(this, "Grant 'Do Not Disturb access' in Settings > Sound > Do Not Disturb > Allow exceptions > Apps > T1DAlert for reliable alarms", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, R.string.dnd_permission_hint, Toast.LENGTH_LONG).show();
             Intent intent = new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
             startActivity(intent);
         }
@@ -139,41 +98,24 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == 100 || requestCode == 101 || requestCode == 102 || requestCode == 103 || requestCode == 104) {
+        if (requestCode == AppConfig.REQUEST_POST_NOTIFICATIONS) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 launchNextActivity();
             } else {
-                Toast.makeText(this, "Permission required for app features to work", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.notification_permission_required, Toast.LENGTH_SHORT).show();
             }
         }
     }
 
     private void launchNextActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 100);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, AppConfig.REQUEST_POST_NOTIFICATIONS);
             return; // Wait for permission result
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_CONTACTS}, 101);
-            return;
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS}, 102);
-            return;
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECEIVE_SMS}, 104);
-            return;
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
-                && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 103);
-            return;
         }
         if (!Settings.canDrawOverlays(this)) {
             Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
             overlayPermissionLauncher.launch(intent);
-            Toast.makeText(this, "Grant 'Display over other apps' permission for full-screen alerts", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.overlay_permission_hint, Toast.LENGTH_SHORT).show();
             return; // Wait for result
         }
         startServiceAndLaunch();
