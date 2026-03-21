@@ -12,13 +12,10 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.content.pm.PackageManager;
 import android.location.Location;
-import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.PowerManager;
-import android.provider.Settings;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -263,7 +260,7 @@ public class FallDetectionService extends Service implements SensorEventListener
                 confidence
         );
 
-        SharedPreferences sharedPreferences = AppPrefsStore.get(this);
+        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putBoolean(AppPrefs.KEY_FALL_DETECTED, unconsciousLikely);
         editor.putLong(AppPrefs.KEY_FALL_DETECTED_AT, unconsciousLikely ? System.currentTimeMillis() : 0L);
@@ -275,33 +272,10 @@ public class FallDetectionService extends Service implements SensorEventListener
         if (unconsciousLikely) {
             saveLastKnownLocation();
             NotificationHelper.updateFallDetectionNotification(this, impactG, postureRatio, confidence);
-            launchFallFullscreenAlert(confidence);
             Log.e(TAG, "Unconsciousness likely: " + telemetry);
         } else {
             Log.d(TAG, "Fall not classified as unconscious: " + telemetry);
         }
-    }
-
-    private void launchFallFullscreenAlert(float confidence) {
-        if (!Settings.canDrawOverlays(this)) {
-            Log.w(TAG, "Overlay permission missing, cannot show full-screen fall alert");
-            return;
-        }
-
-        SharedPreferences prefs = AppPrefsStore.get(this);
-        String location = prefs.getString(AppPrefs.KEY_LAST_LOCATION, "");
-        String line2 = location == null || location.trim().isEmpty()
-                ? getString(R.string.fall_alert_location_unavailable)
-                : location.trim();
-
-        Intent intent = new Intent(this, LowAlertOverlayService.class);
-        intent.putExtra(LowAlertOverlayService.EXTRA_ALERT_TITLE, getString(R.string.fall_fullscreen_title));
-        intent.putExtra(
-                LowAlertOverlayService.EXTRA_ALERT_LINE_1,
-                getString(R.string.fall_fullscreen_line1, Math.round(confidence * 100f))
-        );
-        intent.putExtra(LowAlertOverlayService.EXTRA_ALERT_LINE_2, line2);
-        startService(intent);
     }
 
     private void resetImpactState() {
@@ -377,12 +351,12 @@ public class FallDetectionService extends Service implements SensorEventListener
 
         Location bestLocation = null;
         try {
-            for (String provider : locationManager.getAllProviders()) {
+            for (String provider : locationManager.getProviders(true)) {
                 Location location = locationManager.getLastKnownLocation(provider);
                 if (location == null) {
                     continue;
                 }
-                if (bestLocation == null || isBetterLocation(location, bestLocation)) {
+                if (bestLocation == null || location.getTime() > bestLocation.getTime()) {
                     bestLocation = location;
                 }
             }
@@ -391,74 +365,18 @@ public class FallDetectionService extends Service implements SensorEventListener
             return;
         }
 
-        if (bestLocation != null) {
-            persistLocation(bestLocation);
+        if (bestLocation == null) {
+            Log.w(TAG, "No last known location available");
             return;
         }
 
-        Log.w(TAG, "No cached location, requesting fresh one-shot updates");
-        requestFreshLocation(locationManager);
-    }
+        String locationString = String.format(Locale.US, "https://maps.google.com/?q=%.6f,%.6f",
+                bestLocation.getLatitude(), bestLocation.getLongitude());
 
-    private void requestFreshLocation(LocationManager locationManager) {
-        requestSingleUpdateIfPossible(locationManager, LocationManager.NETWORK_PROVIDER);
-        requestSingleUpdateIfPossible(locationManager, LocationManager.GPS_PROVIDER);
-        requestSingleUpdateIfPossible(locationManager, LocationManager.PASSIVE_PROVIDER);
-    }
-
-    private void requestSingleUpdateIfPossible(LocationManager locationManager, String provider) {
-        try {
-            boolean hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-            boolean hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-            if (!hasFine && !hasCoarse) {
-                return;
-            }
-            if (!locationManager.isProviderEnabled(provider)) {
-                return;
-            }
-            locationManager.requestSingleUpdate(provider, new LocationListener() {
-                @Override
-                public void onLocationChanged(Location location) {
-                    if (location != null) {
-                        persistLocation(location);
-                    }
-                }
-            }, Looper.getMainLooper());
-        } catch (Exception e) {
-            Log.w(TAG, "Unable to request location from provider: " + provider, e);
-        }
-    }
-
-    private boolean isBetterLocation(Location candidate, Location currentBest) {
-        if (candidate == null) {
-            return false;
-        }
-        if (currentBest == null) {
-            return true;
-        }
-        long timeDelta = candidate.getTime() - currentBest.getTime();
-        if (timeDelta > 30_000L) {
-            return true;
-        }
-        if (timeDelta < -30_000L) {
-            return false;
-        }
-        float candidateAccuracy = candidate.hasAccuracy() ? candidate.getAccuracy() : Float.MAX_VALUE;
-        float bestAccuracy = currentBest.hasAccuracy() ? currentBest.getAccuracy() : Float.MAX_VALUE;
-        return candidateAccuracy < bestAccuracy;
-    }
-
-    private void persistLocation(Location location) {
-        String locationString = String.format(
-                Locale.US,
-                "https://maps.google.com/?q=%.6f,%.6f",
-                location.getLatitude(),
-                location.getLongitude()
-        );
-        SharedPreferences sharedPreferences = AppPrefsStore.get(this);
+        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putString(AppPrefs.KEY_LAST_LOCATION, locationString);
-        editor.putLong(AppPrefs.KEY_LAST_LOCATION_AT, location.getTime());
+        editor.putLong(AppPrefs.KEY_LAST_LOCATION_AT, bestLocation.getTime());
         editor.apply();
     }
 

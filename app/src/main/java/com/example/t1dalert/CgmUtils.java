@@ -1,5 +1,8 @@
 package com.example.t1dalert;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+
 public final class CgmUtils {
 
     private CgmUtils() {
@@ -29,17 +32,21 @@ public final class CgmUtils {
         }
     }
 
-    public static String buildNightscoutEntriesUrl(String nightscoutUrl) {
+    public static String buildNightscoutEntriesUrl(String nightscoutUrl, String apiToken, String accessToken) {
         if (nightscoutUrl == null || nightscoutUrl.trim().isEmpty()) {
             throw new IllegalArgumentException("missing_url");
         }
 
         String normalized = nightscoutUrl.trim();
-        return normalized + "/api/v1/entries?count=1";
-    }
+        String encodedApiToken = encodeForUrl(apiToken == null ? "" : apiToken);
 
-    public static String buildLegacyNightscoutEntriesUrl(String nightscoutUrl, String apiToken, String accessToken) {
-        return buildNightscoutEntriesUrl(nightscoutUrl);
+        if (normalized.startsWith("http://")) {
+            normalized = "http://" + encodedApiToken + "@" + normalized.substring(7);
+        } else if (normalized.startsWith("https://")) {
+            normalized = "https://" + encodedApiToken + "@" + normalized.substring(8);
+        }
+
+        return normalized + "/api/v1/entries?token=" + (accessToken == null ? "" : accessToken) + "&count=1";
     }
 
     public static int parseIntOrDefault(String value, int fallback) {
@@ -47,6 +54,14 @@ public final class CgmUtils {
             return Integer.parseInt(value);
         } catch (Exception ignored) {
             return fallback;
+        }
+    }
+
+    private static String encodeForUrl(String value) {
+        try {
+            return URLEncoder.encode(value, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            return value;
         }
     }
 }

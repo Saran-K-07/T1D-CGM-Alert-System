@@ -1,118 +1,273 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:scrollbars="vertical"
     tools:context=".Settings">
 
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/nightscout_url_layout"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginEnd="32dp"
-        app:layout_constraintBottom_toTopOf="@+id/api_token_layout"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_chainStyle="packed">
+        android:orientation="vertical"
+        android:padding="20dp">
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/nightscout_url"
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/nightscout_url_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/nightscout_url"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Nightscout Domain or URL" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/api_token_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Nightscout Domain or URL" />
-    </com.google.android.material.textfield.TextInputLayout>
+            android:layout_marginTop="12dp">
 
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/api_token_layout"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="32dp"
-        app:layout_constraintBottom_toTopOf="@+id/access_token_layout"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/nightscout_url_layout">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/api_token"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="API Token" />
+        </com.google.android.material.textfield.TextInputLayout>
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/api_token"
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/access_token_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="API Token" />
-    </com.google.android.material.textfield.TextInputLayout>
+            android:layout_marginTop="12dp">
 
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/access_token_layout"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="32dp"
-        app:layout_constraintBottom_toTopOf="@+id/low_sgv_layout"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/api_token_layout">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/access_token"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Access Token" />
+        </com.google.android.material.textfield.TextInputLayout>
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/access_token"
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/low_sgv_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Access Token" />
-    </com.google.android.material.textfield.TextInputLayout>
+            android:layout_marginTop="12dp">
 
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/low_sgv_layout"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="32dp"
-        app:layout_constraintBottom_toTopOf="@+id/high_sgv_layout"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/access_token_layout">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/low_sgv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Low SGV Value"
+                android:inputType="number" />
+        </com.google.android.material.textfield.TextInputLayout>
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/low_sgv"
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/high_sgv_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="number"
-            android:hint="Low SGV Value" />
-    </com.google.android.material.textfield.TextInputLayout>
+            android:layout_marginTop="12dp">
 
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/high_sgv_layout"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="32dp"
-        app:layout_constraintBottom_toTopOf="@+id/save_button"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/low_sgv_layout">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/high_sgv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="High SGV Value"
+                android:inputType="number" />
+        </com.google.android.material.textfield.TextInputLayout>
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/high_sgv"
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/escalation_number_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="number"
-            android:hint="High SGV Value" />
-    </com.google.android.material.textfield.TextInputLayout>
+            android:layout_marginTop="12dp">
 
-    <Button
-        android:id="@+id/save_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Save"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/high_sgv_layout" />
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/escalation_number"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Escalation Number"
+                android:inputType="phone" />
+        </com.google.android.material.textfield.TextInputLayout>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/show_settings_qr_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:text="Show Settings QR" />
+
+            <Button
+                android:id="@+id/scan_settings_qr_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="Scan Settings QR" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/show_contacts_qr_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:text="Show Contacts QR" />
+
+            <Button
+                android:id="@+id/scan_contacts_qr_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="Scan Contacts QR" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/contact_1_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Not selected"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/remove_contact_1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Remove" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/contact_2_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Not selected"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/remove_contact_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Remove" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/contact_3_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Not selected"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/remove_contact_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Remove" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/contact_4_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Not selected"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/remove_contact_4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Remove" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/contact_5_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Not selected"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/remove_contact_5"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Remove" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/save_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="8dp"
+            android:text="Save" />
+
+    </LinearLayout>
+
+</ScrollView>

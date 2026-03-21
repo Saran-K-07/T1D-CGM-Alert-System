@@ -28,20 +28,20 @@ import java.util.ArrayList;
 public class CgmBackgroundService extends Service {
 
     private static final long WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L;
-    private static final String DEFAULT_UNCONSCIOUS_ESCALATION_NUMBER = "8144225325";
+    private static final String DEFAULT_UNCONSCIOUS_ESCALATION_NUMBER = "";
     private RequestQueue requestQueue;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private String lastSgv = "---";
     private String lastTrend = "X";
     private PowerManager.WakeLock wakeLock;
     private CgmRepository cgmRepository;
-    private MlRuntimeEngine mlRuntimeEngine;
 
     private final Runnable cgmDataRefresher = new Runnable() {
         @Override
         public void run() {
             fetchCgmData();
-            handler.postDelayed(this, AppConfig.CGM_REFRESH_INTERVAL_MS);
+            final int REFRESH_INTERVAL = 15000; // 15 seconds
+            handler.postDelayed(this, REFRESH_INTERVAL);
         }
     };
 
@@ -56,7 +56,6 @@ public class CgmBackgroundService extends Service {
         startForeground(NotificationHelper.NOTIFICATION_ID, notification);
         requestQueue = Volley.newRequestQueue(this);
         cgmRepository = new CgmRepository(this, requestQueue);
-        mlRuntimeEngine = new MlRuntimeEngine(this);
         handler.post(cgmDataRefresher);
     }
 
@@ -72,7 +71,7 @@ public class CgmBackgroundService extends Service {
     }
 
     private void fetchCgmData() {
-        SharedPreferences sharedPreferences = AppPrefsStore.get(this);
+        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
         if (sharedPreferences.getString(AppPrefs.KEY_NIGHTSCOUT_URL, "").trim().isEmpty()) {
             NotificationHelper.updateNotification(this, getString(R.string.live_cgm_missing_url_short), "?");
             return;
@@ -90,7 +89,6 @@ public class CgmBackgroundService extends Service {
                 String trend = CgmUtils.getTrendArrow(data.direction);
                 lastSgv = String.valueOf(sgv);
                 lastTrend = trend;
-                mlRuntimeEngine.predictWithLatest(sgv, data.timestampMs);
 
                 if (sgv < finalLowSgv) {
                     startFallDetectionService();
@@ -132,6 +130,8 @@ public class CgmBackgroundService extends Service {
                     editor.putBoolean(AppPrefs.KEY_UNCONSCIOUS_LIKELY, false);
                     editor.putFloat(AppPrefs.KEY_UNCONSCIOUS_CONFIDENCE, 0f);
                     editor.putString(AppPrefs.KEY_UNCONSCIOUS_TELEMETRY, "");
+                    editor.putString(AppPrefs.KEY_LAST_LOCATION, "");
+                    editor.putLong(AppPrefs.KEY_LAST_LOCATION_AT, 0L);
                     editor.apply();
                 }
 
@@ -167,7 +167,7 @@ public class CgmBackgroundService extends Service {
             Toast.makeText(this, R.string.receive_sms_permission_missing_hint, Toast.LENGTH_LONG).show();
         }
 
-        SharedPreferences sharedPreferences = AppPrefsStore.get(this);
+        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
         String[] contacts = new String[AppPrefs.CONTACT_KEYS.length];
         for (int i = 0; i < AppPrefs.CONTACT_KEYS.length; i++) {
             contacts[i] = sharedPreferences.getString(AppPrefs.CONTACT_KEYS[i], "");

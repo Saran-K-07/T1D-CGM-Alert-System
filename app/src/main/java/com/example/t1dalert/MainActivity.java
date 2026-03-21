@@ -1,18 +1,19 @@
 package com.example.t1dalert;
 
 import android.Manifest;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
-import android.view.View;
+import android.provider.Settings;
 import android.widget.Button;
 import android.widget.Toast;
-import android.provider.Settings;
-import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -25,28 +26,29 @@ import androidx.core.view.WindowInsetsCompat;
 import com.google.android.material.textfield.TextInputEditText;
 
 public class MainActivity extends AppCompatActivity {
-    public static final String PREFS_NAME = "T1DAlertPrefs";
-    public static final String KEY_NIGHTSCOUT_URL = "nightscout_url";
-    public static final String KEY_API_TOKEN = "api_token";
-    public static final String KEY_ACCESS_TOKEN = "access_token";
-    public static final String KEY_LOW_SGV = "low_sgv";
-    public static final String KEY_HIGH_SGV = "high_sgv";
-
     private TextInputEditText nightscoutUrlEditText;
     private TextInputEditText apiTokenEditText;
     private TextInputEditText accessTokenEditText;
-    private Button submitButton;
+    private final ActivityResultLauncher<Intent> overlayPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (Settings.canDrawOverlays(this)) {
+                    startServiceAndLaunch();
+                } else {
+                    Toast.makeText(this, R.string.overlay_permission_required, Toast.LENGTH_SHORT).show();
+                }
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        SharedPreferences sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String url = sharedPreferences.getString(KEY_NIGHTSCOUT_URL, "");
-        String apiToken = sharedPreferences.getString(KEY_API_TOKEN, "");
-        String accessToken = sharedPreferences.getString(KEY_ACCESS_TOKEN, "");
+        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        String url = sharedPreferences.getString(AppPrefs.KEY_NIGHTSCOUT_URL, "");
+        String apiToken = sharedPreferences.getString(AppPrefs.KEY_API_TOKEN, "");
+        String accessToken = sharedPreferences.getString(AppPrefs.KEY_ACCESS_TOKEN, "");
 
         if (!url.isEmpty() && !apiToken.isEmpty() && !accessToken.isEmpty()) {
+            checkDndPermission(); // Check after data is set
             launchNextActivity();
             return;
         }
@@ -62,67 +64,66 @@ public class MainActivity extends AppCompatActivity {
         nightscoutUrlEditText = findViewById(R.id.nightscout_url);
         apiTokenEditText = findViewById(R.id.api_token);
         accessTokenEditText = findViewById(R.id.access_token);
-        submitButton = findViewById(R.id.submit);
+        Button submitButton = findViewById(R.id.submit);
 
-        submitButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String nightscoutUrl = nightscoutUrlEditText.getText().toString().trim();
-                String apiToken = apiTokenEditText.getText().toString().trim();
-                String accessToken = accessTokenEditText.getText().toString().trim();
+        submitButton.setOnClickListener(v -> {
+                String nightscoutUrl = String.valueOf(nightscoutUrlEditText.getText()).trim();
+                String inputApiToken = String.valueOf(apiTokenEditText.getText()).trim();
+                String inputAccessToken = String.valueOf(accessTokenEditText.getText()).trim();
 
-                if (nightscoutUrl.isEmpty() || apiToken.isEmpty() || accessToken.isEmpty()) {
-                    Toast.makeText(MainActivity.this, "Please fill out all fields", Toast.LENGTH_SHORT).show();
+                if (nightscoutUrl.isEmpty() || inputApiToken.isEmpty() || inputAccessToken.isEmpty()) {
+                    Toast.makeText(MainActivity.this, R.string.fill_all_fields, Toast.LENGTH_SHORT).show();
                     return;
                 }
-                saveData(nightscoutUrl, apiToken, accessToken);
+                SharedPreferences.Editor editor = sharedPreferences.edit();
+                editor.putString(AppPrefs.KEY_NIGHTSCOUT_URL, nightscoutUrl);
+                editor.putString(AppPrefs.KEY_API_TOKEN, inputApiToken);
+                editor.putString(AppPrefs.KEY_ACCESS_TOKEN, inputAccessToken);
+                AlertKeyManager.getOrCreateSharedAlertKey(sharedPreferences);
+                editor.apply();
+                Toast.makeText(MainActivity.this, R.string.saved, Toast.LENGTH_SHORT).show();
                 launchNextActivity();
-            }
         });
     }
 
-    private void saveData(String url, String apiToken, String accessToken) {
-        SharedPreferences sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.putString(KEY_NIGHTSCOUT_URL, url);
-        editor.putString(KEY_API_TOKEN, apiToken);
-        editor.putString(KEY_ACCESS_TOKEN, accessToken);
-        editor.apply();
-        Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show();
+    private void checkDndPermission() {
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (!nm.isNotificationPolicyAccessGranted()) {
+            Toast.makeText(this, R.string.dnd_permission_hint, Toast.LENGTH_LONG).show();
+            Intent intent = new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
+            startActivity(intent);
+        }
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == 100) {
+        if (requestCode == AppConfig.REQUEST_POST_NOTIFICATIONS) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startServiceAndLaunch();
+                launchNextActivity();
             } else {
-                Toast.makeText(this, "Notification permission required for background monitoring", Toast.LENGTH_SHORT).show();
-                startServiceAndLaunch(); // Proceed anyway, but notification may not show
+                Toast.makeText(this, R.string.notification_permission_required, Toast.LENGTH_SHORT).show();
             }
         }
     }
 
     private void launchNextActivity() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 100);
-                return; // Wait for permission result
-            }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, AppConfig.REQUEST_POST_NOTIFICATIONS);
+            return; // Wait for permission result
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+        if (!Settings.canDrawOverlays(this)) {
             Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
-            startActivity(intent);
-            Toast.makeText(this, "Grant 'Display over other apps' permission for full-screen alerts", Toast.LENGTH_SHORT).show();
-            return; // Wait for user to grant
+            overlayPermissionLauncher.launch(intent);
+            Toast.makeText(this, R.string.overlay_permission_hint, Toast.LENGTH_SHORT).show();
+            return; // Wait for result
         }
         startServiceAndLaunch();
     }
 
     private void startServiceAndLaunch() {
         Intent serviceIntent = new Intent(MainActivity.this, CgmBackgroundService.class);
-        startService(serviceIntent);
+        ContextCompat.startForegroundService(this, serviceIntent);
         Intent intent = new Intent(MainActivity.this, LiveCgmActivity.class);
         startActivity(intent);
         finish();

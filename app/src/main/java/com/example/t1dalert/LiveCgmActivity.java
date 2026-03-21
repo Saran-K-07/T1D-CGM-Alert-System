@@ -3,47 +3,35 @@ package com.example.t1dalert;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-import com.android.volley.AuthFailureError;
-import com.android.volley.DefaultRetryPolicy;
-import com.android.volley.Request;
 import com.android.volley.RequestQueue;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
-import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
-
-import java.util.HashMap;
-import java.util.Map;
 
 public class LiveCgmActivity extends AppCompatActivity {
 
     private TextView cgmValueTextView;
     private TextView cgmTrendTextView;
-    private Button settingsButton;
-    private RequestQueue requestQueue;
+    private CgmRepository cgmRepository;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private final Runnable cgmDataRefresher = new Runnable() {
         @Override
         public void run() {
             fetchCgmData();
-            final int REFRESH_INTERVAL = 15000; // 15 seconds
-            handler.postDelayed(this, REFRESH_INTERVAL);
+            handler.postDelayed(this, AppConfig.CGM_REFRESH_INTERVAL_MS);
         }
     };
 
@@ -60,9 +48,10 @@ public class LiveCgmActivity extends AppCompatActivity {
 
         cgmValueTextView = findViewById(R.id.cgm_value);
         cgmTrendTextView = findViewById(R.id.cgm_trend);
-        settingsButton = findViewById(R.id.settings_button);
+        Button settingsButton = findViewById(R.id.settings_button);
 
-        requestQueue = Volley.newRequestQueue(LiveCgmActivity.this);
+        RequestQueue requestQueue = Volley.newRequestQueue(LiveCgmActivity.this);
+        cgmRepository = new CgmRepository(this, requestQueue);
 
         settingsButton.setOnClickListener(v -> {
             Intent intent = new Intent(LiveCgmActivity.this, Settings.class);
@@ -73,110 +62,49 @@ public class LiveCgmActivity extends AppCompatActivity {
     }
 
     private void fetchCgmData() {
-        SharedPreferences sharedPreferences = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
-        String nightscoutUrl = sharedPreferences.getString(MainActivity.KEY_NIGHTSCOUT_URL, "");
-        String apiToken = sharedPreferences.getString(MainActivity.KEY_API_TOKEN, "");
-        String accessToken = sharedPreferences.getString(MainActivity.KEY_ACCESS_TOKEN, "");
-        String lowSgvString = sharedPreferences.getString(MainActivity.KEY_LOW_SGV, "70");
-        String highSgvString = sharedPreferences.getString(MainActivity.KEY_HIGH_SGV, "180");
-
-        if (nightscoutUrl.isEmpty()) {
-            Toast.makeText(this, "Nightscout URL not set", Toast.LENGTH_SHORT).show();
+        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        if (sharedPreferences.getString(AppPrefs.KEY_NIGHTSCOUT_URL, "").trim().isEmpty()) {
+            cgmValueTextView.setText(R.string.live_cgm_missing_url_short);
+            cgmTrendTextView.setText(R.string.live_cgm_trend_unavailable_short);
+            Toast.makeText(this, R.string.nightscout_url_missing, Toast.LENGTH_SHORT).show();
             return;
         }
 
-        int lowSgv = 70;
-        int highSgv = 180;
-        try {
-            lowSgv = Integer.parseInt(lowSgvString);
-            highSgv = Integer.parseInt(highSgvString);
-        } catch (NumberFormatException e) {
-            Log.e("LiveCgmActivity", "Invalid SGV values in SharedPreferences", e);
-        }
+        int low = CgmUtils.parseIntOrDefault(
+                sharedPreferences.getString(AppPrefs.KEY_LOW_SGV, String.valueOf(AppConfig.DEFAULT_LOW_SGV)),
+                AppConfig.DEFAULT_LOW_SGV
+        );
+        int high = CgmUtils.parseIntOrDefault(
+                sharedPreferences.getString(AppPrefs.KEY_HIGH_SGV, String.valueOf(AppConfig.DEFAULT_HIGH_SGV)),
+                AppConfig.DEFAULT_HIGH_SGV
+        );
 
-        String apiUrl = nightscoutUrl + "/api/v1/entries?count=1&token=" + accessToken;
-
-        int finalLowSgv = lowSgv;
-        int finalHighSgv = highSgv;
-        StringRequest request = new StringRequest(Request.Method.GET, apiUrl,
-                new Response.Listener<String>() {
-                    @Override
-                    public void onResponse(String response) {
-                        try {
-                            if (response != null && !response.trim().isEmpty()) {
-                                String[] lines = response.split("\n");
-                                if (lines.length > 0) {
-                                    String[] parts = lines[0].split("\t");
-
-                                    if (parts.length >= 4) {
-                                        int sgv = Integer.parseInt(parts[2]);
-                                        String direction = parts[3].replace("\"", "");
-
-                                        cgmValueTextView.setText(String.valueOf(sgv));
-                                        cgmTrendTextView.setText(getTrendArrow(direction));
-
-                                        if (sgv < finalLowSgv || sgv > finalHighSgv) {
-                                            cgmValueTextView.setTextColor(Color.RED);
-                                        } else {
-                                            cgmValueTextView.setTextColor(Color.BLACK);
-                                        }
-
-                                    } else {
-                                        Log.w("LiveCgmActivity", "Unexpected data format: " + lines[0]);
-                                        cgmValueTextView.setText("Fmt");
-                                    }
-                                }
-                            } else {
-                                Log.w("LiveCgmActivity", "API returned an empty response.");
-                                cgmValueTextView.setText("N/A");
-                            }
-                        } catch (Exception e) {
-                            Log.e("LiveCgmActivity", "Error parsing string response", e);
-                            Toast.makeText(LiveCgmActivity.this, "Error parsing data", Toast.LENGTH_SHORT).show();
-                            cgmValueTextView.setText("Err");
-                        }
-                    }
-                },
-                new Response.ErrorListener() {
-                    @Override
-                    public void onErrorResponse(VolleyError error) {
-                    Log.e("LiveCgmActivity", "Volley request failed: " + error.toString());
-                    Toast.makeText(LiveCgmActivity.this, "Failed to fetch data", Toast.LENGTH_SHORT).show();
-                    cgmValueTextView.setText("---");
-                    cgmTrendTextView.setText("X");
-                }}) {
+        cgmRepository.fetchLatest(new CgmRepository.Listener() {
             @Override
-            public Map<String, String> getHeaders() throws AuthFailureError {
-                Map<String, String> headers = new HashMap<>();
-                headers.put("api-secret", apiToken);
-                return headers;
+            public void onSuccess(CgmData data) {
+                cgmValueTextView.setText(String.valueOf(data.sgv));
+                cgmTrendTextView.setText(CgmUtils.getTrendArrow(data.direction));
+                if (data.sgv < low || data.sgv > high) {
+                    cgmValueTextView.setTextColor(ContextCompat.getColor(LiveCgmActivity.this, R.color.cgm_alert_red));
+                } else {
+                    cgmValueTextView.setTextColor(ContextCompat.getColor(LiveCgmActivity.this, R.color.cgm_text_normal));
+                }
             }
-        };
 
-        request.setRetryPolicy(new DefaultRetryPolicy(10000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES,DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
-        requestQueue.add(request);
-    }
+            @Override
+            public void onSchemaError() {
+                cgmValueTextView.setText(R.string.live_cgm_format_short);
+                cgmTrendTextView.setText(R.string.live_cgm_trend_unavailable_short);
+                Toast.makeText(LiveCgmActivity.this, R.string.error_parsing_data, Toast.LENGTH_SHORT).show();
+            }
 
-    private String getTrendArrow(String trendString) {
-        if (trendString == null) return "?";
-        switch (trendString) {
-            case "DoubleUp":
-                return "↑↑";
-            case "SingleUp":
-                return "↑";
-            case "FortyFiveUp":
-                return "↗";
-            case "Flat":
-                return "→";
-            case "FortyFiveDown":
-                return "↘";
-            case "SingleDown":
-                return "↓";
-            case "DoubleDown":
-                return "↓↓";
-            default:
-                return "?";
-        }
+            @Override
+            public void onNetworkError() {
+                cgmValueTextView.setText(R.string.live_cgm_loading_failed_short);
+                cgmTrendTextView.setText(R.string.live_cgm_trend_unavailable_short);
+                Toast.makeText(LiveCgmActivity.this, R.string.error_fetching_data, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @Override
