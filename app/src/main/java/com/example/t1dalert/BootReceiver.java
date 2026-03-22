@@ -15,6 +15,7 @@ public class BootReceiver extends BroadcastReceiver {
             sharedPreferences.edit()
                     .remove(AppPrefs.KEY_ML_PREDICTION_MGDL)
                     .remove(AppPrefs.KEY_ML_PREDICTION_AT)
+                    .remove(AppPrefs.KEY_ML_LAST_INFERENCE_AT)
                     .putString(AppPrefs.KEY_ML_STATUS, MlRuntimeStatus.WARMING_UP)
                     .apply();
 
