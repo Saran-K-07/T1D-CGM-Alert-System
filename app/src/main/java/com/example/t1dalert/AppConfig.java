@@ -16,6 +16,12 @@ public final class AppConfig {
     public static final int REQUEST_RECEIVE_SMS = 104;
     public static final int REQUEST_CAMERA = 105;
 
+    public static final int ML_FEATURE_COUNT = 10;
+    public static final int ML_HISTORY_CAP = 72;
+    public static final String ML_MODEL_ASSET_PATH = "ml/model.onnx";
+    public static final String ML_METADATA_ASSET_PATH = "ml/metadata.json";
+    public static final String ML_METADATA_VERSION = "bitmaml_1h_v1";
+
     private AppConfig() {
     }
 }

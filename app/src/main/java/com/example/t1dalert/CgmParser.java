@@ -4,6 +4,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONException;
 
+import java.time.Instant;
+
 public final class CgmParser {
 
     private CgmParser() {
@@ -44,7 +46,8 @@ public final class CgmParser {
 
             int sgv = first.getInt("sgv");
             String direction = first.optString("direction", "");
-            return new CgmData(sgv, direction);
+            long timestampMs = parseTimestampMs(first);
+            return new CgmData(sgv, direction, timestampMs);
         } catch (JSONException e) {
             throw new IllegalArgumentException("invalid_json", e);
         }
@@ -73,7 +76,8 @@ public final class CgmParser {
 
             int sgv = first.getInt("sgv");
             String direction = first.optString("direction", "");
-            return new CgmData(sgv, direction);
+            long timestampMs = parseTimestampMs(first);
+            return new CgmData(sgv, direction, timestampMs);
         } catch (JSONException e) {
             throw new IllegalArgumentException("invalid_json_object", e);
         }
@@ -89,9 +93,36 @@ public final class CgmParser {
         try {
             int sgv = Integer.parseInt(parts[2].replace("\"", "").trim());
             String direction = parts[3].replace("\"", "").trim();
-            return new CgmData(sgv, direction);
+            return new CgmData(sgv, direction, System.currentTimeMillis());
         } catch (Exception e) {
             throw new IllegalArgumentException("legacy_parse_failed", e);
         }
+    }
+
+    private static long parseTimestampMs(JSONObject obj) {
+        long fromDate = obj.optLong("date", 0L);
+        if (fromDate > 0L) {
+            if (fromDate < 100000000000L) {
+                return fromDate * 1000L;
+            }
+            return fromDate;
+        }
+
+        String[] candidates = {
+                obj.optString("dateString", ""),
+                obj.optString("created_at", ""),
+                obj.optString("sysTime", "")
+        };
+        for (String candidate : candidates) {
+            if (candidate == null || candidate.trim().isEmpty()) {
+                continue;
+            }
+            try {
+                return Instant.parse(candidate).toEpochMilli();
+            } catch (Exception ignored) {
+            }
+        }
+
+        return System.currentTimeMillis();
     }
 }
