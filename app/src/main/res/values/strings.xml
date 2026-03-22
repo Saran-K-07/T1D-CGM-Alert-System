@@ -63,4 +63,11 @@
     <string name="contacts_qr_description">Includes trusted senders and emergency contact mapping only.</string>
     <string name="contacts_qr_imported">Trusted senders and contact mapping imported.</string>
     <string name="scan_contacts_qr_prompt">Scan contacts/trusted QR</string>
+    <string name="ml_prediction_placeholder">Pred +60m: -- mg/dL</string>
+    <string name="ml_prediction_value">Pred +60m: %1$d mg/dL</string>
+    <string name="ml_status_warming">ML status: warming up</string>
+    <string name="ml_status_ready">ML status: ready</string>
+    <string name="ml_status_model_unavailable">ML status: model unavailable</string>
+    <string name="ml_status_metadata_invalid">ML status: metadata invalid</string>
+    <string name="ml_status_prediction_failed">ML status: prediction failed</string>
 </resources>

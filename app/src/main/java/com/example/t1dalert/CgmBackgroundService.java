@@ -35,6 +35,7 @@ public class CgmBackgroundService extends Service {
     private String lastTrend = "X";
     private PowerManager.WakeLock wakeLock;
     private CgmRepository cgmRepository;
+    private MlRuntimeEngine mlRuntimeEngine;
 
     private final Runnable cgmDataRefresher = new Runnable() {
         @Override
@@ -56,6 +57,7 @@ public class CgmBackgroundService extends Service {
         startForeground(NotificationHelper.NOTIFICATION_ID, notification);
         requestQueue = Volley.newRequestQueue(this);
         cgmRepository = new CgmRepository(this, requestQueue);
+        mlRuntimeEngine = new MlRuntimeEngine(this);
         handler.post(cgmDataRefresher);
     }
 
@@ -89,6 +91,7 @@ public class CgmBackgroundService extends Service {
                 String trend = CgmUtils.getTrendArrow(data.direction);
                 lastSgv = String.valueOf(sgv);
                 lastTrend = trend;
+                mlRuntimeEngine.predictWithLatest(sgv, data.timestampMs);
 
                 if (sgv < finalLowSgv) {
                     startFallDetectionService();
