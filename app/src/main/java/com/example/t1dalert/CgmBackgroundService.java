@@ -41,8 +41,7 @@ public class CgmBackgroundService extends Service {
         @Override
         public void run() {
             fetchCgmData();
-            final int REFRESH_INTERVAL = 15000; // 15 seconds
-            handler.postDelayed(this, REFRESH_INTERVAL);
+            handler.postDelayed(this, AppConfig.CGM_REFRESH_INTERVAL_MS);
         }
     };
 

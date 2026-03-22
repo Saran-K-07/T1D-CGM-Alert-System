@@ -55,6 +55,9 @@
             android:name=".Settings"
             android:exported="false" />
         <activity
+            android:name=".MlPredictionChartActivity"
+            android:exported="false" />
+        <activity
             android:name="com.journeyapps.barcodescanner.CaptureActivity"
             android:exported="false"
             android:screenOrientation="fullSensor"
