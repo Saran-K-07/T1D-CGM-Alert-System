@@ -58,6 +58,14 @@ public final class AppPrefs {
     public static final String KEY_METRIC_UNTRUSTED_SENDER = "metric_untrusted_sender";
     public static final String KEY_METRIC_FALL_SENSOR_UNAVAILABLE = "metric_fall_sensor_unavailable";
 
+    public static final String KEY_ML_HISTORY_JSON = "ml_history_json";
+    public static final String KEY_ML_STATUS = "ml_status";
+    public static final String KEY_ML_PREDICTION_MGDL = "ml_prediction_mgdl";
+    public static final String KEY_ML_PREDICTION_AT = "ml_prediction_at";
+    public static final String KEY_ML_LAST_INFERENCE_AT = "ml_last_inference_at";
+    public static final String KEY_ML_PREDICTION_SERIES_JSON = "ml_prediction_series_json";
+    public static final String KEY_ML_CHART_WINDOW_SIZE = "ml_chart_window_size";
+
     private AppPrefs() {
     }
 }

@@ -49,12 +49,18 @@ public class LiveCgmActivity extends AppCompatActivity {
         cgmValueTextView = findViewById(R.id.cgm_value);
         cgmTrendTextView = findViewById(R.id.cgm_trend);
         Button settingsButton = findViewById(R.id.settings_button);
+        Button chartButton = findViewById(R.id.chart_button);
 
         RequestQueue requestQueue = Volley.newRequestQueue(LiveCgmActivity.this);
         cgmRepository = new CgmRepository(this, requestQueue);
 
         settingsButton.setOnClickListener(v -> {
             Intent intent = new Intent(LiveCgmActivity.this, Settings.class);
+            startActivity(intent);
+        });
+
+        chartButton.setOnClickListener(v -> {
+            Intent intent = new Intent(LiveCgmActivity.this, MlPredictionChartActivity.class);
             startActivity(intent);
         });
 

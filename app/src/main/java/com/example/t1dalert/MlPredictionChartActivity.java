@@ -30,7 +30,7 @@ public class MlPredictionChartActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_ml_prediction_chart);
 
-        SharedPreferences prefs = AppPrefsStore.get(this);
+        SharedPreferences prefs = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
         allPoints = MlPredictionSeriesStore.readPoints(prefs);
 
         chartView = findViewById(R.id.chart_view);

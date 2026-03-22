@@ -38,7 +38,6 @@ public class Settings extends AppCompatActivity {
     private TextInputEditText accessTokenEditText;
     private TextInputEditText lowSgvEditText;
     private TextInputEditText highSgvEditText;
-    private TextInputEditText escalationNumberEditText;
     private TextView contact1TextView;
     private TextView contact2TextView;
     private TextView contact3TextView;
@@ -93,7 +92,6 @@ public class Settings extends AppCompatActivity {
         accessTokenEditText = findViewById(R.id.access_token);
         lowSgvEditText = findViewById(R.id.low_sgv);
         highSgvEditText = findViewById(R.id.high_sgv);
-        escalationNumberEditText = findViewById(R.id.escalation_number);
         contact1TextView = findViewById(R.id.contact_1_text);
         contact2TextView = findViewById(R.id.contact_2_text);
         contact3TextView = findViewById(R.id.contact_3_text);
@@ -138,14 +136,11 @@ public class Settings extends AppCompatActivity {
         String accessToken = sharedPreferences.getString(AppPrefs.KEY_ACCESS_TOKEN, "");
         String lowSgv = sharedPreferences.getString(AppPrefs.KEY_LOW_SGV, String.valueOf(AppConfig.DEFAULT_LOW_SGV));
         String highSgv = sharedPreferences.getString(AppPrefs.KEY_HIGH_SGV, String.valueOf(AppConfig.DEFAULT_HIGH_SGV));
-        String escalationNumber = sharedPreferences.getString(AppPrefs.KEY_ESCALATION_NUMBER, "");
-
         nightscoutUrlEditText.setText(nightscoutUrl);
         apiTokenEditText.setText(apiToken);
         accessTokenEditText.setText(accessToken);
         lowSgvEditText.setText(lowSgv);
         highSgvEditText.setText(highSgv);
-        escalationNumberEditText.setText(escalationNumber);
     }
 
     private void saveSettings() {
@@ -157,14 +152,11 @@ public class Settings extends AppCompatActivity {
         String accessToken = accessTokenEditText.getText().toString().trim();
         String lowSgvString = lowSgvEditText.getText().toString().trim();
         String highSgvString = highSgvEditText.getText().toString().trim();
-        String escalationNumber = textOf(escalationNumberEditText);
-
         editor.putString(AppPrefs.KEY_NIGHTSCOUT_URL, nightscoutUrl);
         editor.putString(AppPrefs.KEY_API_TOKEN, apiToken);
         editor.putString(AppPrefs.KEY_ACCESS_TOKEN, accessToken);
         editor.putString(AppPrefs.KEY_LOW_SGV, lowSgvString);
         editor.putString(AppPrefs.KEY_HIGH_SGV, highSgvString);
-        editor.putString(AppPrefs.KEY_ESCALATION_NUMBER, escalationNumber);
 
         editor.apply();
 
@@ -218,7 +210,8 @@ public class Settings extends AppCompatActivity {
                 textOf(apiTokenEditText),
                 textOf(accessTokenEditText),
                 AlertKeyManager.getOrCreateSharedAlertKey(getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE)),
-                textOf(escalationNumberEditText),
+                getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+                        .getString(AppPrefs.KEY_ESCALATION_NUMBER, ""),
                 textOf(lowSgvEditText),
                 textOf(highSgvEditText)
         );
@@ -280,7 +273,6 @@ public class Settings extends AppCompatActivity {
         nightscoutUrlEditText.setText(parsed.nightscoutUrl);
         apiTokenEditText.setText(parsed.apiToken);
         accessTokenEditText.setText(parsed.accessToken);
-        escalationNumberEditText.setText(parsed.escalationNumber);
         lowSgvEditText.setText(parsed.lowSgv);
         highSgvEditText.setText(parsed.highSgv);
 
