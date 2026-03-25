@@ -1,0 +1,68 @@
+{
+  "model_version": "bitmaml_1h_v1",
+  "model_file": "model.onnx",
+  "window_size": 36,
+  "horizon_steps": 12,
+  "feature_order": [
+    "glucose_level",
+    "meal",
+    "bolus",
+    "hypoevent",
+    "sin_hour",
+    "cos_hour",
+    "isnight",
+    "ismealtime",
+    "exercise"
+  ],
+  "output": {
+    "name": "predicted_sgv_norm",
+    "unit_after_denorm": "mg/dL"
+  },
+  "scaler": {
+    "type": "minmax",
+    "data_min": [
+      62.0,
+      0.0,
+      0.0,
+      0.0,
+      -1.0,
+      -1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "data_max": [
+      247.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "scale": [
+      0.005405405405405406,
+      1.0,
+      1.0,
+      1.0,
+      0.5,
+      0.5,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "min_offset": [
+      -0.33513513513513515,
+      0.0,
+      0.0,
+      0.0,
+      0.5,
+      0.5,
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}

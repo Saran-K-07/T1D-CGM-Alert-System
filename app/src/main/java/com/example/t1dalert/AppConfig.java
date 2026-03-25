@@ -11,6 +11,7 @@ public final class AppConfig {
 
     public static final int DEFAULT_LOW_SGV = 70;
     public static final int DEFAULT_HIGH_SGV = 180;
+    public static final int BATTERY_THROTTLE_PERCENT = 20;
 
     public static final int REQUEST_POST_NOTIFICATIONS = 100;
     public static final int REQUEST_READ_CONTACTS = 101;
