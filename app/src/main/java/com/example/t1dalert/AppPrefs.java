@@ -8,6 +8,7 @@ public final class AppPrefs {
     public static final String KEY_ACCESS_TOKEN = "access_token";
     public static final String KEY_SHARED_ALERT_KEY = "shared_alert_key";
     public static final String KEY_TRUSTED_SENDERS = "trusted_senders";
+    public static final String KEY_USER_PHONE = "user_phone";
     public static final String KEY_ESCALATION_NUMBER = "escalation_number";
     public static final String KEY_LOW_SGV = "low_sgv";
     public static final String KEY_HIGH_SGV = "high_sgv";

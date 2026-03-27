@@ -20,6 +20,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
@@ -38,6 +39,7 @@ public class Settings extends AppCompatActivity {
     private TextInputEditText accessTokenEditText;
     private TextInputEditText lowSgvEditText;
     private TextInputEditText highSgvEditText;
+    private TextInputEditText userPhoneEditText;
     private TextView contact1TextView;
     private TextView contact2TextView;
     private TextView contact3TextView;
@@ -92,6 +94,7 @@ public class Settings extends AppCompatActivity {
         accessTokenEditText = findViewById(R.id.access_token);
         lowSgvEditText = findViewById(R.id.low_sgv);
         highSgvEditText = findViewById(R.id.high_sgv);
+        userPhoneEditText = findViewById(R.id.user_phone);
         contact1TextView = findViewById(R.id.contact_1_text);
         contact2TextView = findViewById(R.id.contact_2_text);
         contact3TextView = findViewById(R.id.contact_3_text);
@@ -136,11 +139,13 @@ public class Settings extends AppCompatActivity {
         String accessToken = sharedPreferences.getString(AppPrefs.KEY_ACCESS_TOKEN, "");
         String lowSgv = sharedPreferences.getString(AppPrefs.KEY_LOW_SGV, String.valueOf(AppConfig.DEFAULT_LOW_SGV));
         String highSgv = sharedPreferences.getString(AppPrefs.KEY_HIGH_SGV, String.valueOf(AppConfig.DEFAULT_HIGH_SGV));
+        String userPhone = sharedPreferences.getString(AppPrefs.KEY_USER_PHONE, "");
         nightscoutUrlEditText.setText(nightscoutUrl);
         apiTokenEditText.setText(apiToken);
         accessTokenEditText.setText(accessToken);
         lowSgvEditText.setText(lowSgv);
         highSgvEditText.setText(highSgv);
+        userPhoneEditText.setText(userPhone);
     }
 
     private void saveSettings() {
@@ -152,11 +157,13 @@ public class Settings extends AppCompatActivity {
         String accessToken = accessTokenEditText.getText().toString().trim();
         String lowSgvString = lowSgvEditText.getText().toString().trim();
         String highSgvString = highSgvEditText.getText().toString().trim();
+        String userPhone = userPhoneEditText.getText().toString().trim();
         editor.putString(AppPrefs.KEY_NIGHTSCOUT_URL, nightscoutUrl);
         editor.putString(AppPrefs.KEY_API_TOKEN, apiToken);
         editor.putString(AppPrefs.KEY_ACCESS_TOKEN, accessToken);
         editor.putString(AppPrefs.KEY_LOW_SGV, lowSgvString);
         editor.putString(AppPrefs.KEY_HIGH_SGV, highSgvString);
+        editor.putString(AppPrefs.KEY_USER_PHONE, userPhone);
 
         editor.apply();
 
@@ -223,7 +230,8 @@ public class Settings extends AppCompatActivity {
         String trustedCsv = TrustedSenderMapper.buildTrustedSendersForQr(
                 getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE)
         );
-        String payload = ContactShareQrCodec.toPayload(trustedCsv);
+        String userPhone = textOf(userPhoneEditText);
+        String payload = ContactShareQrCodec.toPayload(trustedCsv, userPhone);
         showQrDialog(payload, R.string.contacts_qr_title, R.string.contacts_qr_description);
     }
 
@@ -285,14 +293,126 @@ public class Settings extends AppCompatActivity {
 
     private void applyScannedContactShare(ContactShareQrCodec.ParsedContactShare parsed) {
         SharedPreferences prefs = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putString(AppPrefs.KEY_TRUSTED_SENDERS, parsed.trustedSenders).apply();
+        String mergedTrusted = mergeTrustedSenders(parsed.trustedSenders, parsed.userPhone);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString(AppPrefs.KEY_TRUSTED_SENDERS, mergedTrusted);
+        if (textOf(userPhoneEditText).isEmpty() && parsed.userPhone != null && !parsed.userPhone.trim().isEmpty()) {
+            editor.putString(AppPrefs.KEY_USER_PHONE, parsed.userPhone.trim());
+            userPhoneEditText.setText(parsed.userPhone.trim());
+        }
+        editor.apply();
 
-        int addedCount = TrustedSenderMapper.addTrustedSendersToEmergencyContacts(prefs, parsed.trustedSenders);
+        int addedCount = TrustedSenderMapper.addTrustedSendersToEmergencyContacts(prefs, mergedTrusted);
         updateContactDisplay();
         Toast.makeText(this, R.string.contacts_qr_imported, Toast.LENGTH_LONG).show();
         if (addedCount > 0) {
             Toast.makeText(this, getString(R.string.qr_trusted_added_contacts, addedCount), Toast.LENGTH_LONG).show();
         }
+
+        if (parsed.userPhone != null && !parsed.userPhone.trim().isEmpty()) {
+            promptForScannedContactName(parsed.userPhone.trim());
+        }
+    }
+
+    private String mergeTrustedSenders(String trustedSendersCsv, String userPhone) {
+        StringBuilder merged = new StringBuilder();
+        if (trustedSendersCsv != null && !trustedSendersCsv.trim().isEmpty()) {
+            merged.append(trustedSendersCsv.trim());
+        }
+        if (userPhone != null && !userPhone.trim().isEmpty()) {
+            if (merged.length() > 0) {
+                merged.append(",");
+            }
+            merged.append(userPhone.trim());
+        }
+        return merged.toString();
+    }
+
+    private void promptForScannedContactName(String phoneRaw) {
+        String normalizedPhone = normalizePhone(phoneRaw);
+        if (normalizedPhone.isEmpty()) {
+            return;
+        }
+
+        SharedPreferences prefs = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        int existingIndex = findContactIndexByPhone(prefs, normalizedPhone);
+        String existingName = existingIndex >= 0
+                ? prefs.getString(AppPrefs.CONTACT_NAME_KEYS[existingIndex], "")
+                : "";
+
+        TextInputLayout inputLayout = new TextInputLayout(this);
+        inputLayout.setPadding(24, 8, 24, 0);
+        TextInputEditText nameEditText = new TextInputEditText(this);
+        nameEditText.setHint(getString(R.string.contact_name_hint));
+        if (existingName != null && !existingName.trim().isEmpty()) {
+            nameEditText.setText(existingName.trim());
+            nameEditText.setSelection(nameEditText.getText() == null ? 0 : nameEditText.getText().length());
+        }
+        inputLayout.addView(nameEditText);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.save_contact_name_title, normalizedPhone))
+                .setView(inputLayout)
+                .setPositiveButton(R.string.save, (dialog, which) -> {
+                    String inputName = nameEditText.getText() == null ? "" : nameEditText.getText().toString().trim();
+                    if (inputName.isEmpty()) {
+                        Toast.makeText(this, R.string.contact_name_required, Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    saveScannedContactName(normalizedPhone, inputName);
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void saveScannedContactName(String normalizedPhone, String name) {
+        SharedPreferences prefs = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        int index = findContactIndexByPhone(prefs, normalizedPhone);
+        if (index < 0) {
+            index = findFirstEmptyContactIndex(prefs);
+        }
+        if (index < 0) {
+            Toast.makeText(this, R.string.max_contacts_allowed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        prefs.edit()
+                .putString(AppPrefs.CONTACT_KEYS[index], normalizedPhone)
+                .putString(AppPrefs.CONTACT_NAME_KEYS[index], name)
+                .apply();
+        updateContactDisplay();
+        Toast.makeText(this, R.string.contact_added, Toast.LENGTH_SHORT).show();
+    }
+
+    private int findContactIndexByPhone(SharedPreferences prefs, String normalizedPhone) {
+        for (int i = 0; i < AppPrefs.CONTACT_KEYS.length; i++) {
+            String current = normalizePhone(prefs.getString(AppPrefs.CONTACT_KEYS[i], ""));
+            if (normalizedPhone.equals(current)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private int findFirstEmptyContactIndex(SharedPreferences prefs) {
+        for (int i = 0; i < AppPrefs.CONTACT_KEYS.length; i++) {
+            String current = normalizePhone(prefs.getString(AppPrefs.CONTACT_KEYS[i], ""));
+            if (current.isEmpty()) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private String normalizePhone(String value) {
+        if (value == null) {
+            return "";
+        }
+        String cleaned = value.trim().replaceAll("[^\\d+]", "");
+        if (cleaned.startsWith("+")) {
+            return "+" + cleaned.substring(1).replace("+", "");
+        }
+        return cleaned.replace("+", "");
     }
 
     private Bitmap generateQrBitmap(String text, int sizePx) {

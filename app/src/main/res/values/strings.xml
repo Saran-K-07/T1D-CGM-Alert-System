@@ -16,6 +16,7 @@
     <string name="unable_generate_qr">Unable to generate QR</string>
     <string name="scan_settings_qr_prompt">Scan settings QR</string>
     <string name="notification_permission_required">Notification permission is required for alerts</string>
+    <string name="app_permissions_required">Please grant required permissions to continue</string>
     <string name="alert_receive_failed_message">Received secure alert but failed to verify/decode.</string>
     <string name="overlay_permission_required">Overlay permission required for full-screen alerts</string>
     <string name="dnd_permission_hint">Grant Do Not Disturb access for reliable alarms</string>
@@ -30,6 +31,11 @@
     <string name="max_contacts_allowed">Maximum 5 contacts allowed</string>
     <string name="contact_removed">Contact removed</string>
     <string name="contact_not_selected">Not selected</string>
+    <string name="save_contact_name_title">Save contact name for %1$s</string>
+    <string name="contact_name_hint">Contact Name</string>
+    <string name="contact_name_required">Please enter a contact name</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
     <string name="settings_qr_title">Settings QR</string>
     <string name="contacts_qr_title">Contacts/Trusted QR</string>
     <string name="close">Close</string>
@@ -56,7 +62,11 @@
     <string name="fall_monitoring_active_desc">Collecting motion data for emergency detection</string>
     <string name="possible_fall_content">Possible unconscious fall: impact %1$d m/s^2, lying ratio %2$d%%, confidence %3$d%%</string>
     <string name="possible_fall_detected_title">Possible fall detected</string>
+    <string name="fall_fullscreen_title">POSSIBLE UNCONSCIOUS FALL!</string>
+    <string name="fall_fullscreen_line1">Emergency attention required (%1$d%% confidence)</string>
+    <string name="fall_alert_location_unavailable">Location unavailable</string>
     <string name="incoming_emergency_title">Emergency alert from %1$s</string>
+    <string name="incoming_emergency_fullscreen_title">INCOMING EMERGENCY ALERT</string>
     <string name="saved">Saved!</string>
     <string name="fill_all_fields">Please fill out all fields</string>
     <string name="qr_trusted_added_contacts">Imported %1$d trusted sender(s) as emergency contacts</string>

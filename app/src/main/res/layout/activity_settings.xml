@@ -79,6 +79,20 @@
                 android:inputType="number" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/user_phone_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/user_phone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Your Mobile Number"
+                android:inputType="phone" />
+        </com.google.android.material.textfield.TextInputLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
