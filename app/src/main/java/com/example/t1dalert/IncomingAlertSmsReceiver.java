@@ -3,12 +3,9 @@ package com.example.t1dalert;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.provider.Settings;
 import android.provider.Telephony;
-import android.speech.tts.TextToSpeech;
-import android.speech.tts.UtteranceProgressListener;
 import android.telephony.SmsMessage;
-
-import java.util.Locale;
 
 public class IncomingAlertSmsReceiver extends BroadcastReceiver {
 
@@ -69,7 +66,7 @@ public class IncomingAlertSmsReceiver extends BroadcastReceiver {
         }
 
         NotificationHelper.showIncomingAlertNotification(context, sender, messageBody);
-        speakMessage(context, messageBody);
+        launchIncomingEmergencyFullscreenAlert(context, sender, messageBody);
     }
 
     private boolean isStrictEmergencyAlert(String body) {
@@ -111,30 +108,20 @@ public class IncomingAlertSmsReceiver extends BroadcastReceiver {
         return cleaned.replace("+", "");
     }
 
-    private void speakMessage(Context context, String message) {
-        final TextToSpeech[] ttsHolder = new TextToSpeech[1];
-        ttsHolder[0] = new TextToSpeech(context.getApplicationContext(), status -> {
-            if (status == TextToSpeech.SUCCESS) {
-                ttsHolder[0].setLanguage(Locale.US);
-                ttsHolder[0].setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                    @Override
-                    public void onStart(String utteranceId) {
-                    }
-
-                    @Override
-                    public void onDone(String utteranceId) {
-                        ttsHolder[0].stop();
-                        ttsHolder[0].shutdown();
-                    }
-
-                    @Override
-                    public void onError(String utteranceId) {
-                        ttsHolder[0].stop();
-                        ttsHolder[0].shutdown();
-                    }
-                });
-                ttsHolder[0].speak(message, TextToSpeech.QUEUE_FLUSH, null, "incoming_alert_sms");
-            }
-        });
+    private void launchIncomingEmergencyFullscreenAlert(Context context, String sender, String message) {
+        if (!Settings.canDrawOverlays(context)) {
+            return;
+        }
+        Intent fullscreenIntent = new Intent(context, LowAlertOverlayService.class);
+        fullscreenIntent.putExtra(
+                LowAlertOverlayService.EXTRA_ALERT_TITLE,
+                context.getString(R.string.incoming_emergency_fullscreen_title)
+        );
+        fullscreenIntent.putExtra(
+                LowAlertOverlayService.EXTRA_ALERT_LINE_1,
+                context.getString(R.string.incoming_emergency_title, sender)
+        );
+        fullscreenIntent.putExtra(LowAlertOverlayService.EXTRA_ALERT_LINE_2, message);
+        context.startService(fullscreenIntent);
     }
 }

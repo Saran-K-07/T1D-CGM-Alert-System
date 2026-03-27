@@ -28,11 +28,15 @@ public final class TrustedSenderMapper {
         }
 
         LinkedHashSet<String> existing = new LinkedHashSet<>();
+        String[] workingContacts = new String[AppPrefs.CONTACT_KEYS.length];
         for (String key : AppPrefs.CONTACT_KEYS) {
             String current = normalizePhone(prefs.getString(key, ""));
             if (!current.isEmpty()) {
                 existing.add(current);
             }
+        }
+        for (int i = 0; i < AppPrefs.CONTACT_KEYS.length; i++) {
+            workingContacts[i] = normalizePhone(prefs.getString(AppPrefs.CONTACT_KEYS[i], ""));
         }
 
         SharedPreferences.Editor editor = prefs.edit();
@@ -41,12 +45,13 @@ public final class TrustedSenderMapper {
             if (existing.contains(phone)) {
                 continue;
             }
-            int emptyIndex = findEmptyContactSlot(prefs);
+            int emptyIndex = findEmptyContactSlot(workingContacts);
             if (emptyIndex < 0) {
                 break;
             }
             editor.putString(AppPrefs.CONTACT_KEYS[emptyIndex], phone);
             editor.putString(AppPrefs.CONTACT_NAME_KEYS[emptyIndex], "QR Trusted Sender");
+            workingContacts[emptyIndex] = phone;
             existing.add(phone);
             added++;
         }
@@ -54,9 +59,9 @@ public final class TrustedSenderMapper {
         return added;
     }
 
-    private static int findEmptyContactSlot(SharedPreferences prefs) {
-        for (int i = 0; i < AppPrefs.CONTACT_KEYS.length; i++) {
-            if (normalizePhone(prefs.getString(AppPrefs.CONTACT_KEYS[i], "")).isEmpty()) {
+    private static int findEmptyContactSlot(String[] workingContacts) {
+        for (int i = 0; i < workingContacts.length; i++) {
+            if (normalizePhone(workingContacts[i]).isEmpty()) {
                 return i;
             }
         }

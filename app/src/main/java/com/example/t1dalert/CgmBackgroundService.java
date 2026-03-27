@@ -129,8 +129,6 @@ public class CgmBackgroundService extends Service {
                     editor.putBoolean(AppPrefs.KEY_UNCONSCIOUS_LIKELY, false);
                     editor.putFloat(AppPrefs.KEY_UNCONSCIOUS_CONFIDENCE, 0f);
                     editor.putString(AppPrefs.KEY_UNCONSCIOUS_TELEMETRY, "");
-                    editor.putString(AppPrefs.KEY_LAST_LOCATION, "");
-                    editor.putLong(AppPrefs.KEY_LAST_LOCATION_AT, 0L);
                     editor.apply();
                 }
 
