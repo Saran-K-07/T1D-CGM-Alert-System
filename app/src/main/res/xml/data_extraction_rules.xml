@@ -5,15 +5,13 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="sharedpref" path="T1DAlertPrefs.xml" />
+        <exclude domain="sharedpref" path="T1DAlertPrefs__androidx_security_crypto_encrypted_prefs_key_keyset__.xml" />
+        <exclude domain="sharedpref" path="T1DAlertPrefs__androidx_security_crypto_encrypted_prefs_value_keyset__.xml" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="sharedpref" path="T1DAlertPrefs.xml" />
+        <exclude domain="sharedpref" path="T1DAlertPrefs__androidx_security_crypto_encrypted_prefs_key_keyset__.xml" />
+        <exclude domain="sharedpref" path="T1DAlertPrefs__androidx_security_crypto_encrypted_prefs_value_keyset__.xml" />
     </device-transfer>
-    -->
 </data-extraction-rules>

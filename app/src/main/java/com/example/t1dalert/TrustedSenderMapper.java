@@ -2,7 +2,9 @@ package com.example.t1dalert;
 
 import android.content.SharedPreferences;
 
+import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 
 public final class TrustedSenderMapper {
@@ -22,6 +24,10 @@ public final class TrustedSenderMapper {
     }
 
     public static int addTrustedSendersToEmergencyContacts(SharedPreferences prefs, String trustedSendersCsv) {
+        return addTrustedSendersToEmergencyContacts(prefs, trustedSendersCsv, Collections.emptyMap());
+    }
+
+    public static int addTrustedSendersToEmergencyContacts(SharedPreferences prefs, String trustedSendersCsv, Map<String, String> trustedReceiverNames) {
         LinkedHashSet<String> trusted = parseCsvPhones(trustedSendersCsv);
         if (trusted.isEmpty()) {
             return 0;
@@ -40,9 +46,17 @@ public final class TrustedSenderMapper {
         }
 
         SharedPreferences.Editor editor = prefs.edit();
+        boolean changed = false;
         int added = 0;
         for (String phone : trusted) {
-            if (existing.contains(phone)) {
+            int existingIndex = findExistingContactIndex(workingContacts, phone);
+            if (existingIndex >= 0) {
+                String preferredName = preferredNameFor(trustedReceiverNames, phone);
+                String existingName = safe(prefs.getString(AppPrefs.CONTACT_NAME_KEYS[existingIndex], ""));
+                if (!preferredName.isEmpty() && existingName.isEmpty()) {
+                    editor.putString(AppPrefs.CONTACT_NAME_KEYS[existingIndex], preferredName);
+                    changed = true;
+                }
                 continue;
             }
             int emptyIndex = findEmptyContactSlot(workingContacts);
@@ -50,12 +64,16 @@ public final class TrustedSenderMapper {
                 break;
             }
             editor.putString(AppPrefs.CONTACT_KEYS[emptyIndex], phone);
-            editor.putString(AppPrefs.CONTACT_NAME_KEYS[emptyIndex], "QR Trusted Sender");
+            String preferredName = preferredNameFor(trustedReceiverNames, phone);
+            editor.putString(AppPrefs.CONTACT_NAME_KEYS[emptyIndex], preferredName.isEmpty() ? "QR Trusted Sender" : preferredName);
             workingContacts[emptyIndex] = phone;
             existing.add(phone);
             added++;
+            changed = true;
         }
-        editor.apply();
+        if (changed) {
+            editor.apply();
+        }
         return added;
     }
 
@@ -66,6 +84,27 @@ public final class TrustedSenderMapper {
             }
         }
         return -1;
+    }
+
+    private static int findExistingContactIndex(String[] workingContacts, String normalizedPhone) {
+        for (int i = 0; i < workingContacts.length; i++) {
+            if (normalizedPhone.equals(normalizePhone(workingContacts[i]))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static String preferredNameFor(Map<String, String> trustedReceiverNames, String normalizedPhone) {
+        if (trustedReceiverNames == null || trustedReceiverNames.isEmpty()) {
+            return "";
+        }
+        for (Map.Entry<String, String> entry : trustedReceiverNames.entrySet()) {
+            if (normalizedPhone.equals(normalizePhone(entry.getKey()))) {
+                return safe(entry.getValue());
+            }
+        }
+        return "";
     }
 
     private static LinkedHashSet<String> parseCsvPhones(String csv) {
@@ -92,5 +131,9 @@ public final class TrustedSenderMapper {
             return "+" + cleaned.substring(1).replace("+", "");
         }
         return cleaned.replace("+", "");
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value.trim();
     }
 }

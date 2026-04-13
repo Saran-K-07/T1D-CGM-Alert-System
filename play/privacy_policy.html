@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>T1D Alert Privacy Policy</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 860px; padding: 0 1rem; color: #111; }
+    h1, h2 { line-height: 1.25; }
+    code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy for T1D Alert</h1>
+  <p><strong>Last updated:</strong> 2026-03-29</p>
+
+  <h2>1) Overview</h2>
+  <p>T1D Alert helps users monitor glucose values and send emergency alerts during low-glucose and potential unconscious-fall situations. This policy explains what data the app processes, why it is processed, and how users can control it.</p>
+
+  <h2>2) Data We Process</h2>
+  <ul>
+    <li>User-entered configuration: Nightscout URL, API token, access token, user phone number.</li>
+    <li>Emergency contacts: phone numbers and contact names entered/scanned by the user.</li>
+    <li>Health-related data: glucose readings (SGV), trend direction, and prediction output shown in-app.</li>
+    <li>Location data: last known location used in high-priority emergency alerts.</li>
+    <li>Messaging data: emergency SMS content sent by the app and trusted incoming emergency SMS content.</li>
+    <li>Diagnostic counters: local app metrics such as SMS/decrypt failures.</li>
+  </ul>
+
+  <h2>3) How Data Is Used</h2>
+  <ul>
+    <li>Fetch and display glucose readings.</li>
+    <li>Detect critical low-glucose events and trigger emergency alerts.</li>
+    <li>Detect potential unconscious-fall events and escalate emergency messaging.</li>
+    <li>Send emergency SMS alerts to user-configured recipients.</li>
+    <li>Display incoming trusted emergency alerts.</li>
+  </ul>
+
+  <h2>4) Data Sharing</h2>
+  <ul>
+    <li>The app sends emergency SMS messages to recipients explicitly configured by the user.</li>
+    <li>The app does not include third-party ads SDKs.</li>
+    <li>The app does not use third-party analytics SDKs.</li>
+    <li>The app does not sell user data.</li>
+  </ul>
+
+  <h2>5) Data Storage and Retention</h2>
+  <ul>
+    <li>App settings and operational state are stored locally on-device.</li>
+    <li>Data remains until the user edits/removes it in-app, clears app storage, or uninstalls the app.</li>
+  </ul>
+
+  <h2>6) Security</h2>
+  <ul>
+    <li>The app uses a shared alert-key mechanism for secure alert message encoding/decoding between trusted instances.</li>
+    <li>Some emergency escalation messages can be sent as plain SMS (carrier transport).</li>
+    <li>Users should configure secure endpoints (HTTPS) for Nightscout URLs where possible.</li>
+  </ul>
+
+  <h2>7) Permissions</h2>
+  <p>The app may request permissions including SEND_SMS, RECEIVE_SMS, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, SYSTEM_ALERT_WINDOW, POST_NOTIFICATIONS, CAMERA, and READ_CONTACTS.</p>
+
+  <h2>8) Children's Privacy</h2>
+  <p>This app is intended for emergency diabetes monitoring workflows and is not directed to children under 13.</p>
+
+  <h2>9) Your Choices</h2>
+  <ul>
+    <li>Edit/remove app settings and contacts in the app.</li>
+    <li>Revoke permissions from Android Settings.</li>
+    <li>Clear app storage or uninstall the app to remove local data.</li>
+  </ul>
+
+  <h2>10) Contact</h2>
+  <p>For privacy questions or requests, contact:</p>
+  <ul>
+    <li>Name: <code>&lt;YOUR_NAME_OR_ORG&gt;</code></li>
+    <li>Email: <code>&lt;YOUR_SUPPORT_EMAIL&gt;</code></li>
+    <li>Address: <code>&lt;OPTIONAL_POSTAL_ADDRESS&gt;</code></li>
+  </ul>
+
+  <h2>11) Changes To This Policy</h2>
+  <p>We may update this policy from time to time. The “Last updated” date will reflect the latest revision.</p>
+</body>
+</html>

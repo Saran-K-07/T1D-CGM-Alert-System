@@ -263,7 +263,7 @@ public class FallDetectionService extends Service implements SensorEventListener
                 confidence
         );
 
-        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = AppPrefsStore.get(this);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putBoolean(AppPrefs.KEY_FALL_DETECTED, unconsciousLikely);
         editor.putLong(AppPrefs.KEY_FALL_DETECTED_AT, unconsciousLikely ? System.currentTimeMillis() : 0L);
@@ -288,7 +288,7 @@ public class FallDetectionService extends Service implements SensorEventListener
             return;
         }
 
-        SharedPreferences prefs = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences prefs = AppPrefsStore.get(this);
         String location = prefs.getString(AppPrefs.KEY_LAST_LOCATION, "");
         String line2 = location == null || location.trim().isEmpty()
                 ? getString(R.string.fall_alert_location_unavailable)
@@ -408,6 +408,11 @@ public class FallDetectionService extends Service implements SensorEventListener
 
     private void requestSingleUpdateIfPossible(LocationManager locationManager, String provider) {
         try {
+            boolean hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            boolean hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            if (!hasFine && !hasCoarse) {
+                return;
+            }
             if (!locationManager.isProviderEnabled(provider)) {
                 return;
             }
@@ -450,7 +455,7 @@ public class FallDetectionService extends Service implements SensorEventListener
                 location.getLatitude(),
                 location.getLongitude()
         );
-        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = AppPrefsStore.get(this);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putString(AppPrefs.KEY_LAST_LOCATION, locationString);
         editor.putLong(AppPrefs.KEY_LAST_LOCATION_AT, location.getTime());

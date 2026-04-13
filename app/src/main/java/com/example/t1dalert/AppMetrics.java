@@ -9,7 +9,7 @@ public final class AppMetrics {
     }
 
     public static void increment(Context context, String key) {
-        SharedPreferences prefs = context.getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences prefs = AppPrefsStore.get(context);
         int current = prefs.getInt(key, 0);
         prefs.edit().putInt(key, current + 1).apply();
     }
