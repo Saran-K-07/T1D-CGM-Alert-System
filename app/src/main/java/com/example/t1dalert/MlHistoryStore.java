@@ -16,15 +16,17 @@ final class MlHistoryStore {
     private MlHistoryStore() {
     }
 
-    static void append(SharedPreferences prefs, long timeMs, int sgv) {
+    static AppendResult append(SharedPreferences prefs, long timeMs, int sgv) {
         List<MlReading> history = readHistory(prefs);
+        long lastTimeMs = 0L;
         if (!history.isEmpty()) {
             MlReading last = history.get(history.size() - 1);
+            lastTimeMs = last.timeMs;
             if (timeMs <= last.timeMs) {
-                return;
+                return AppendResult.skipped(AppendStatus.SKIPPED_NON_MONOTONIC_TIME, history.size(), lastTimeMs);
             }
             if ((timeMs - last.timeMs) < MIN_SAMPLE_GAP_MS) {
-                return;
+                return AppendResult.skipped(AppendStatus.SKIPPED_MIN_GAP, history.size(), lastTimeMs);
             }
         }
         history.add(new MlReading(timeMs, sgv));
@@ -32,6 +34,7 @@ final class MlHistoryStore {
             history.remove(0);
         }
         saveHistory(prefs, history);
+        return AppendResult.added(history.size(), timeMs);
     }
 
     static List<MlReading> readHistory(SharedPreferences prefs) {
@@ -80,5 +83,31 @@ final class MlHistoryStore {
             array.put(obj);
         }
         prefs.edit().putString(AppPrefs.KEY_ML_HISTORY_JSON, array.toString()).apply();
+    }
+
+    enum AppendStatus {
+        ADDED,
+        SKIPPED_NON_MONOTONIC_TIME,
+        SKIPPED_MIN_GAP
+    }
+
+    static final class AppendResult {
+        final AppendStatus status;
+        final int historySize;
+        final long referenceTimeMs;
+
+        private AppendResult(AppendStatus status, int historySize, long referenceTimeMs) {
+            this.status = status;
+            this.historySize = historySize;
+            this.referenceTimeMs = referenceTimeMs;
+        }
+
+        static AppendResult added(int historySize, long timeMs) {
+            return new AppendResult(AppendStatus.ADDED, historySize, timeMs);
+        }
+
+        static AppendResult skipped(AppendStatus status, int historySize, long lastTimeMs) {
+            return new AppendResult(status, historySize, lastTimeMs);
+        }
     }
 }

@@ -166,7 +166,7 @@ public class LowAlertOverlayService extends Service {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (progress >= 100) {
-                    SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+                    SharedPreferences sharedPreferences = AppPrefsStore.get(LowAlertOverlayService.this);
                     SharedPreferences.Editor editor = sharedPreferences.edit();
                     editor.putBoolean(AppPrefs.KEY_OVERLAY_ACTIVE, false);
                     editor.apply();

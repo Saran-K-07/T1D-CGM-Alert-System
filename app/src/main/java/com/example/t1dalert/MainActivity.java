@@ -26,6 +26,7 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.ArrayList;
@@ -49,7 +50,7 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(this, R.string.invalid_settings_qr, Toast.LENGTH_SHORT).show();
                     return;
                 }
-                applyScannedSettings(parsed);
+                confirmApplyScannedSettings(parsed);
             });
     private final ActivityResultLauncher<Intent> overlayPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -64,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = AppPrefsStore.get(this);
         String url = sharedPreferences.getString(AppPrefs.KEY_NIGHTSCOUT_URL, "");
         String apiToken = sharedPreferences.getString(AppPrefs.KEY_API_TOKEN, "");
         String accessToken = sharedPreferences.getString(AppPrefs.KEY_ACCESS_TOKEN, "");
@@ -222,11 +223,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void applyScannedSettings(SettingsQrCodec.ParsedSettings parsed) {
-        SharedPreferences prefs = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences prefs = AppPrefsStore.get(this);
         SettingsSyncHelper.applyParsedSettings(prefs, parsed);
         nightscoutUrlEditText.setText(parsed.nightscoutUrl);
-        apiTokenEditText.setText(parsed.apiToken);
-        accessTokenEditText.setText(parsed.accessToken);
         Toast.makeText(this, R.string.settings_imported, Toast.LENGTH_LONG).show();
+    }
+
+    private void confirmApplyScannedSettings(SettingsQrCodec.ParsedSettings parsed) {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.settings_import_confirm_title)
+                .setMessage(R.string.settings_import_confirm_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.import_settings, (dialog, which) -> applyScannedSettings(parsed))
+                .show();
     }
 }

@@ -13,7 +13,6 @@ public final class AppConfig {
     public static final int DEFAULT_HIGH_SGV = 180;
 
     public static final int REQUEST_POST_NOTIFICATIONS = 100;
-    public static final int REQUEST_READ_CONTACTS = 101;
     public static final int REQUEST_SEND_SMS = 102;
     public static final int REQUEST_LOCATION = 103;
     public static final int REQUEST_RECEIVE_SMS = 104;

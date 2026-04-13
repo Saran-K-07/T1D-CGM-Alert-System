@@ -30,12 +30,15 @@ public final class SecureAlertMessageCodec {
             return DecodeResult.invalid("empty_message");
         }
 
-        if (!message.startsWith(PREFIX)) {
-            return DecodeResult.plain(message);
+        String trimmed = message.trim();
+        if (!trimmed.startsWith(PREFIX)) {
+            return DecodeResult.plain(trimmed);
         }
 
-        String sharedKey = AlertKeyManager.getOrCreateSharedAlertKey(sharedPreferences);
-        return decryptWithSharedKey(sharedKey, message);
+        String sharedKey = sharedPreferences
+                .getString(AppPrefs.KEY_SHARED_ALERT_KEY, "")
+                .trim();
+        return decryptWithSharedKey(sharedKey, trimmed);
     }
 
     static String encryptWithSharedKey(String sharedKey, String plainMessage) {
@@ -82,7 +85,7 @@ public final class SecureAlertMessageCodec {
         }
 
         try {
-            JSONObject envelope = new JSONObject(message.substring(PREFIX.length()));
+            JSONObject envelope = new JSONObject(extractEnvelopeJson(message.substring(PREFIX.length())));
             String version = envelope.optString("v", "");
             String nonceB64 = envelope.optString("n", "");
             String payloadB64 = envelope.optString("p", "");
@@ -93,17 +96,58 @@ public final class SecureAlertMessageCodec {
             }
 
             byte[] keyBytes = deriveKey(sharedKey);
-            String signingInput = version + "." + nonceB64 + "." + payloadB64;
-            String computed = Base64.getEncoder().withoutPadding().encodeToString(hmacSha256(keyBytes, signingInput.getBytes(StandardCharsets.UTF_8)));
-            if (!constantTimeEquals(hmacB64, computed)) {
+            String normalizedNonce = normalizeBase64(nonceB64);
+            String normalizedPayload = normalizeBase64(payloadB64);
+            String signingInput = version + "." + normalizedNonce + "." + normalizedPayload;
+            byte[] computedHmac = hmacSha256(keyBytes, signingInput.getBytes(StandardCharsets.UTF_8));
+            byte[] incomingHmac = decodeBase64Flexible(hmacB64);
+            if (!constantTimeEqualsBytes(incomingHmac, computedHmac)) {
                 return DecodeResult.invalid("hmac_mismatch");
             }
 
-            String payload = new String(Base64.getDecoder().decode(payloadB64), StandardCharsets.UTF_8);
+            String payload = new String(decodeBase64Flexible(normalizedPayload), StandardCharsets.UTF_8);
             return DecodeResult.secure(payload);
         } catch (Exception e) {
             return DecodeResult.invalid("decode_error");
         }
+    }
+
+    private static String extractEnvelopeJson(String raw) {
+        String value = raw == null ? "" : raw.trim();
+        int firstBrace = value.indexOf('{');
+        int lastBrace = value.lastIndexOf('}');
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+            return value.substring(firstBrace, lastBrace + 1);
+        }
+        return value;
+    }
+
+    private static byte[] decodeBase64Flexible(String value) {
+        String normalized = normalizeBase64(value);
+        String padded = addBase64Padding(normalized);
+        try {
+            return Base64.getDecoder().decode(padded);
+        } catch (IllegalArgumentException first) {
+            return Base64.getUrlDecoder().decode(padded);
+        }
+    }
+
+    private static String normalizeBase64(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim().replace("\n", "").replace("\r", "").replace("=", "");
+    }
+
+    private static String addBase64Padding(String value) {
+        int mod = value.length() % 4;
+        if (mod == 0) {
+            return value;
+        }
+        if (mod == 1) {
+            throw new IllegalArgumentException("invalid_base64_length");
+        }
+        return value + (mod == 2 ? "==" : "=");
     }
 
     private static byte[] deriveKey(String sharedKey) throws Exception {
@@ -129,6 +173,17 @@ public final class SecureAlertMessageCodec {
         int r = 0;
         for (int i = 0; i < ab.length; i++) {
             r |= ab[i] ^ bb[i];
+        }
+        return r == 0;
+    }
+
+    private static boolean constantTimeEqualsBytes(byte[] a, byte[] b) {
+        if (a == null || b == null || a.length != b.length) {
+            return false;
+        }
+        int r = 0;
+        for (int i = 0; i < a.length; i++) {
+            r |= a[i] ^ b[i];
         }
         return r == 0;
     }

@@ -70,7 +70,7 @@ public class CgmBackgroundService extends Service {
     }
 
     private void fetchCgmData() {
-        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = AppPrefsStore.get(this);
         if (sharedPreferences.getString(AppPrefs.KEY_NIGHTSCOUT_URL, "").trim().isEmpty()) {
             NotificationHelper.updateNotification(this, getString(R.string.live_cgm_missing_url_short), "?");
             return;
@@ -164,7 +164,7 @@ public class CgmBackgroundService extends Service {
             Toast.makeText(this, R.string.receive_sms_permission_missing_hint, Toast.LENGTH_LONG).show();
         }
 
-        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = AppPrefsStore.get(this);
         String[] contacts = new String[AppPrefs.CONTACT_KEYS.length];
         for (int i = 0; i < AppPrefs.CONTACT_KEYS.length; i++) {
             contacts[i] = sharedPreferences.getString(AppPrefs.CONTACT_KEYS[i], "");

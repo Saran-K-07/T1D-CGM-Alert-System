@@ -10,6 +10,9 @@ public final class AppPrefs {
     public static final String KEY_TRUSTED_SENDERS = "trusted_senders";
     public static final String KEY_USER_PHONE = "user_phone";
     public static final String KEY_ESCALATION_NUMBER = "escalation_number";
+    public static final String KEY_DEVELOPER_MODE = "developer_mode";
+    public static final String KEY_SMS_READER_ENABLED = "sms_reader_enabled";
+    public static final String KEY_LAST_INCOMING_ALERT_AT = "last_incoming_alert_at";
     public static final String KEY_LOW_SGV = "low_sgv";
     public static final String KEY_HIGH_SGV = "high_sgv";
 

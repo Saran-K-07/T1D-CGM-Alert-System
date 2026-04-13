@@ -68,7 +68,7 @@ public class LiveCgmActivity extends AppCompatActivity {
     }
 
     private void fetchCgmData() {
-        SharedPreferences sharedPreferences = getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = AppPrefsStore.get(this);
         if (sharedPreferences.getString(AppPrefs.KEY_NIGHTSCOUT_URL, "").trim().isEmpty()) {
             cgmValueTextView.setText(R.string.live_cgm_missing_url_short);
             cgmTrendTextView.setText(R.string.live_cgm_trend_unavailable_short);

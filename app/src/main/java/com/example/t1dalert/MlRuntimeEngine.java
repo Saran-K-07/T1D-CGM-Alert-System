@@ -20,9 +20,16 @@ public final class MlRuntimeEngine {
     }
 
     public MlPredictionResult predictWithLatest(int latestSgv, long timestampMs) {
-        SharedPreferences prefs = appContext.getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences prefs = AppPrefsStore.get(appContext);
         Log.d(TAG, "predictWithLatest start: sgv=" + latestSgv + ", ts=" + timestampMs);
-        MlHistoryStore.append(prefs, timestampMs, latestSgv);
+        MlHistoryStore.AppendResult appendResult = MlHistoryStore.append(prefs, timestampMs, latestSgv);
+        Log.d(
+                TAG,
+                "history_append status=" + appendResult.status
+                        + ", history_count=" + appendResult.historySize
+                        + ", ref_ts=" + appendResult.referenceTimeMs
+                        + ", needed=36"
+        );
 
         long lastInferenceAt = prefs.getLong(AppPrefs.KEY_ML_LAST_INFERENCE_AT, 0L);
         if (lastInferenceAt > 0L && timestampMs > 0L && (timestampMs - lastInferenceAt) < AppConfig.ML_MIN_INFERENCE_INTERVAL_MS) {
@@ -46,7 +53,8 @@ public final class MlRuntimeEngine {
         List<MlReading> window = MlHistoryStore.latestWindow(prefs, meta.windowSize);
         if (window.isEmpty()) {
             setStatus(prefs, MlRuntimeStatus.WARMING_UP);
-            Log.d(TAG, "predictWithLatest warming up: need window=" + meta.windowSize);
+            int historyCount = MlHistoryStore.readHistory(prefs).size();
+            Log.d(TAG, "predictWithLatest warming up: history_count=" + historyCount + ", need_window=" + meta.windowSize);
             return MlPredictionResult.statusOnly(MlRuntimeStatus.WARMING_UP);
         }
 
