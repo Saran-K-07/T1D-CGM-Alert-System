@@ -268,6 +268,68 @@
             android:alpha="0.12"
             android:background="@android:color/black" />
 
+        <TextView
+            android:id="@+id/emergency_service_sms_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/emergency_service_sms_title"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/emergency_service_sms_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/emergency_service_sms_subtitle"
+            android:textSize="13sp" />
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/emergency_service_sms_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/emergency_service_sms_opt_in" />
+
+        <TextView
+            android:id="@+id/emergency_service_manual_country_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/emergency_service_manual_country_label"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/emergency_service_manual_country_value"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/emergency_service_manual_country_none"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/emergency_service_manual_country_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/emergency_service_manual_country_button" />
+
+        <TextView
+            android:id="@+id/emergency_service_sms_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/emergency_service_sms_status_unknown"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/emergency_service_sms_disclaimer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp"
+            android:text="@string/emergency_service_sms_disclaimer"
+            android:textSize="12sp" />
+
         <Button
             android:id="@+id/save_button"
             android:layout_width="match_parent"

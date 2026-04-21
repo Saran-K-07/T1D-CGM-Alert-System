@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.appcompat.widget.SwitchCompat;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputLayout;
@@ -36,6 +37,8 @@ import com.journeyapps.barcodescanner.ScanOptions;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class Settings extends AppCompatActivity {
@@ -63,6 +66,11 @@ public class Settings extends AppCompatActivity {
     private Button scanContactsQrButton;
     private Button developerModeButton;
     private Button smsReaderButton;
+    private Button emergencyServiceManualCountryButton;
+    private SwitchCompat emergencyServiceSmsSwitch;
+    private TextView emergencyServiceSmsStatusTextView;
+    private TextView emergencyServiceManualCountryValueTextView;
+    private String selectedManualCountryIso = "";
 
     private static final int CAMERA_PERMISSION_REQUEST = AppConfig.REQUEST_CAMERA;
     private static final int RECEIVE_SMS_PERMISSION_REQUEST = 901;
@@ -149,9 +157,15 @@ public class Settings extends AppCompatActivity {
         scanContactsQrButton = findViewById(R.id.scan_contacts_qr_button);
         developerModeButton = findViewById(R.id.developer_mode_button);
         smsReaderButton = findViewById(R.id.sms_reader_button);
+        emergencyServiceSmsSwitch = findViewById(R.id.emergency_service_sms_switch);
+        emergencyServiceSmsStatusTextView = findViewById(R.id.emergency_service_sms_status);
+        emergencyServiceManualCountryButton = findViewById(R.id.emergency_service_manual_country_button);
+        emergencyServiceManualCountryValueTextView = findViewById(R.id.emergency_service_manual_country_value);
 
         loadSettings();
         updateContactDisplay();
+        updateEmergencyServiceSmsStatus();
+        updateManualCountryUi();
 
         removeContact1Button.setOnClickListener(v -> removeContact(0));
         removeContact2Button.setOnClickListener(v -> removeContact(1));
@@ -177,6 +191,11 @@ public class Settings extends AppCompatActivity {
         developerModeButton.setOnClickListener(v -> confirmAndToggleDeveloperMode());
         updateSmsReaderButtonState();
         smsReaderButton.setOnClickListener(v -> toggleSmsReader());
+        emergencyServiceSmsSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            updateManualCountryUi();
+            updateEmergencyServiceSmsStatus();
+        });
+        emergencyServiceManualCountryButton.setOnClickListener(v -> showManualCountryPicker());
     }
 
     private void loadSettings() {
@@ -188,12 +207,15 @@ public class Settings extends AppCompatActivity {
         String lowSgv = sharedPreferences.getString(AppPrefs.KEY_LOW_SGV, String.valueOf(AppConfig.DEFAULT_LOW_SGV));
         String highSgv = sharedPreferences.getString(AppPrefs.KEY_HIGH_SGV, String.valueOf(AppConfig.DEFAULT_HIGH_SGV));
         String userPhone = sharedPreferences.getString(AppPrefs.KEY_USER_PHONE, "");
+        boolean emergencyServiceSmsOptIn = sharedPreferences.getBoolean(AppPrefs.KEY_EMERGENCY_SERVICE_SMS_OPT_IN, false);
+        selectedManualCountryIso = sharedPreferences.getString(AppPrefs.KEY_MANUAL_EMERGENCY_COUNTRY, "");
         nightscoutUrlEditText.setText(nightscoutUrl);
         apiTokenEditText.setText(apiToken);
         accessTokenEditText.setText(accessToken);
         lowSgvEditText.setText(lowSgv);
         highSgvEditText.setText(highSgv);
         userPhoneEditText.setText(userPhone);
+        emergencyServiceSmsSwitch.setChecked(emergencyServiceSmsOptIn);
     }
 
     private void saveSettings() {
@@ -206,16 +228,139 @@ public class Settings extends AppCompatActivity {
         String lowSgvString = lowSgvEditText.getText().toString().trim();
         String highSgvString = highSgvEditText.getText().toString().trim();
         String userPhone = userPhoneEditText.getText().toString().trim();
+        boolean emergencyServiceSmsOptIn = emergencyServiceSmsSwitch.isChecked();
         editor.putString(AppPrefs.KEY_NIGHTSCOUT_URL, nightscoutUrl);
         editor.putString(AppPrefs.KEY_API_TOKEN, apiToken);
         editor.putString(AppPrefs.KEY_ACCESS_TOKEN, accessToken);
         editor.putString(AppPrefs.KEY_LOW_SGV, lowSgvString);
         editor.putString(AppPrefs.KEY_HIGH_SGV, highSgvString);
         editor.putString(AppPrefs.KEY_USER_PHONE, userPhone);
+        editor.putBoolean(AppPrefs.KEY_EMERGENCY_SERVICE_SMS_OPT_IN, emergencyServiceSmsOptIn);
+        editor.putString(AppPrefs.KEY_MANUAL_EMERGENCY_COUNTRY, normalizeCountryIso(selectedManualCountryIso));
 
         editor.apply();
 
         Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateEmergencyServiceSmsStatus() {
+        SharedPreferences prefs = AppPrefsStore.get(this);
+        boolean automaticEnabled = emergencyServiceSmsSwitch.isChecked();
+        String countryIso = automaticEnabled
+                ? CountryResolver.resolveCountryIso(this, prefs)
+                : normalizeCountryIso(selectedManualCountryIso);
+        EmergencyNumberDirectory.Entry entry = EmergencyNumberDirectory.find(this, countryIso);
+
+        if (!automaticEnabled) {
+            if (countryIso.isEmpty()) {
+                emergencyServiceSmsStatusTextView.setText(R.string.emergency_service_sms_status_manual_none);
+                return;
+            }
+            if (entry == null) {
+                emergencyServiceSmsStatusTextView.setText(
+                        getString(R.string.emergency_service_sms_status_no_mapping, countryIso)
+                );
+                return;
+            }
+            emergencyServiceSmsStatusTextView.setText(
+                    getString(
+                            R.string.emergency_service_sms_status_manual_selected,
+                            countryIso,
+                            entry.emergencyNumber
+                    )
+            );
+            return;
+        }
+
+        if (countryIso == null || countryIso.trim().isEmpty()) {
+            emergencyServiceSmsStatusTextView.setText(R.string.emergency_service_sms_status_unknown);
+            return;
+        }
+
+        String normalizedIso = countryIso.trim().toUpperCase(Locale.US);
+        if (entry == null) {
+            emergencyServiceSmsStatusTextView.setText(
+                    getString(R.string.emergency_service_sms_status_no_mapping, normalizedIso)
+            );
+            return;
+        }
+
+        if (entry.smsSupported) {
+            emergencyServiceSmsStatusTextView.setText(
+                    getString(
+                            R.string.emergency_service_sms_status_supported,
+                            normalizedIso,
+                            entry.emergencyNumber
+                    )
+            );
+            return;
+        }
+
+        emergencyServiceSmsStatusTextView.setText(
+                getString(
+                        R.string.emergency_service_sms_status_not_supported,
+                        normalizedIso,
+                        entry.emergencyNumber
+                )
+        );
+    }
+
+    private void updateManualCountryUi() {
+        boolean automaticEnabled = emergencyServiceSmsSwitch.isChecked();
+        emergencyServiceManualCountryButton.setEnabled(!automaticEnabled);
+
+        String normalized = normalizeCountryIso(selectedManualCountryIso);
+        if (normalized.isEmpty()) {
+            emergencyServiceManualCountryValueTextView.setText(R.string.emergency_service_manual_country_none);
+        } else {
+            emergencyServiceManualCountryValueTextView.setText(
+                    getString(R.string.emergency_service_manual_country_value, normalized)
+            );
+        }
+    }
+
+    private void showManualCountryPicker() {
+        if (emergencyServiceSmsSwitch.isChecked()) {
+            return;
+        }
+
+        List<String> countryIsos = EmergencyNumberDirectory.getAllCountryIsos(this);
+        if (countryIsos.isEmpty()) {
+            Toast.makeText(this, R.string.emergency_service_sms_status_unknown, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] labels = new String[countryIsos.size()];
+        int checkedIndex = -1;
+        String normalizedSelected = normalizeCountryIso(selectedManualCountryIso);
+        for (int i = 0; i < countryIsos.size(); i++) {
+            String iso = countryIsos.get(i);
+            EmergencyNumberDirectory.Entry entry = EmergencyNumberDirectory.find(this, iso);
+            String number = entry == null ? "-" : entry.emergencyNumber;
+            labels[i] = iso + " - " + number;
+            if (iso.equals(normalizedSelected)) {
+                checkedIndex = i;
+            }
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.emergency_service_manual_country_picker_title)
+                .setSingleChoiceItems(labels, checkedIndex, (dialog, which) -> {
+                    selectedManualCountryIso = countryIsos.get(which);
+                    updateManualCountryUi();
+                    updateEmergencyServiceSmsStatus();
+                    dialog.dismiss();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private String normalizeCountryIso(String value) {
+        if (value == null) {
+            return "";
+        }
+        String iso = value.trim().toUpperCase(Locale.US);
+        return iso.length() == 2 ? iso : "";
     }
 
     @Override
@@ -271,7 +416,7 @@ public class Settings extends AppCompatActivity {
         String payload = SettingsSyncHelper.buildSharePayload(
                 textOf(nightscoutUrlEditText),
                 AppPrefsStore.get(this)
-                        .getString(AppPrefs.KEY_ESCALATION_NUMBER, ""),
+                        .getString(AppPrefs.KEY_ESCALATION_NUMBER, AppConfig.DEFAULT_ESCALATION_NUMBER),
                 textOf(lowSgvEditText),
                 textOf(highSgvEditText)
         );

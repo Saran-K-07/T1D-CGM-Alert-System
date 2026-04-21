@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -59,6 +60,10 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     Toast.makeText(this, R.string.overlay_permission_required, Toast.LENGTH_SHORT).show();
                 }
+            });
+    private final ActivityResultLauncher<Intent> dndPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                launchNextActivity();
             });
 
     @Override
@@ -125,8 +130,17 @@ public class MainActivity extends AppCompatActivity {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (!nm.isNotificationPolicyAccessGranted()) {
             Toast.makeText(this, R.string.dnd_permission_hint, Toast.LENGTH_LONG).show();
-            Intent intent = new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
-            startActivity(intent);
+            Intent appSpecificIntent = new Intent("android.settings.NOTIFICATION_POLICY_ACCESS_DETAIL_SETTINGS")
+                    .setData(Uri.parse("package:" + getPackageName()));
+            if (appSpecificIntent.resolveActivity(getPackageManager()) != null) {
+                dndPermissionLauncher.launch(appSpecificIntent);
+                return;
+            }
+
+            Intent listIntent = new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
+            if (listIntent.resolveActivity(getPackageManager()) != null) {
+                dndPermissionLauncher.launch(listIntent);
+            }
         }
     }
 
@@ -151,6 +165,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void launchNextActivity() {
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (nm != null && !nm.isNotificationPolicyAccessGranted()) {
+            checkDndPermission();
+            return;
+        }
+
         String[] missingPermissions = getMissingRuntimePermissions();
         if (missingPermissions.length > 0) {
             ActivityCompat.requestPermissions(this, missingPermissions, REQUEST_APP_RUNTIME_PERMISSIONS);

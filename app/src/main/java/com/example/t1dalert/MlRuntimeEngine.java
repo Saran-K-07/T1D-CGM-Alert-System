@@ -2,6 +2,7 @@ package com.example.t1dalert;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
 import android.util.Log;
 
 import java.io.File;
@@ -10,7 +11,6 @@ import java.util.List;
 public final class MlRuntimeEngine {
 
     private static final String TAG = "T1DAlert-ML";
-
     private final Context appContext;
     private volatile MlMetadata metadata;
     private volatile OnnxPredictor predictor;
@@ -21,19 +21,25 @@ public final class MlRuntimeEngine {
 
     public MlPredictionResult predictWithLatest(int latestSgv, long timestampMs) {
         SharedPreferences prefs = AppPrefsStore.get(appContext);
-        Log.d(TAG, "predictWithLatest start: sgv=" + latestSgv + ", ts=" + timestampMs);
+        if (isDebugLoggingEnabled()) {
+            Log.d(TAG, "predictWithLatest start: sgv=" + latestSgv + ", ts=" + timestampMs);
+        }
         MlHistoryStore.AppendResult appendResult = MlHistoryStore.append(prefs, timestampMs, latestSgv);
-        Log.d(
-                TAG,
-                "history_append status=" + appendResult.status
-                        + ", history_count=" + appendResult.historySize
-                        + ", ref_ts=" + appendResult.referenceTimeMs
-                        + ", needed=36"
-        );
+        if (isDebugLoggingEnabled()) {
+            Log.d(
+                    TAG,
+                    "history_append status=" + appendResult.status
+                            + ", history_count=" + appendResult.historySize
+                            + ", ref_ts=" + appendResult.referenceTimeMs
+                            + ", needed=36"
+            );
+        }
 
         long lastInferenceAt = prefs.getLong(AppPrefs.KEY_ML_LAST_INFERENCE_AT, 0L);
         if (lastInferenceAt > 0L && timestampMs > 0L && (timestampMs - lastInferenceAt) < AppConfig.ML_MIN_INFERENCE_INTERVAL_MS) {
-            Log.d(TAG, "predictWithLatest skipped: throttled");
+            if (isDebugLoggingEnabled()) {
+                Log.d(TAG, "predictWithLatest skipped: throttled");
+            }
             String currentStatus = prefs.getString(AppPrefs.KEY_ML_STATUS, MlRuntimeStatus.WARMING_UP);
             if (MlRuntimeStatus.READY.equals(currentStatus)) {
                 int prediction = prefs.getInt(AppPrefs.KEY_ML_PREDICTION_MGDL, Integer.MIN_VALUE);
@@ -46,7 +52,9 @@ public final class MlRuntimeEngine {
 
         MlMetadata meta = ensureModelReady(prefs);
         if (meta == null) {
-            Log.w(TAG, "predictWithLatest skipped: model not ready, status=" + prefs.getString(AppPrefs.KEY_ML_STATUS, MlRuntimeStatus.MODEL_UNAVAILABLE));
+            if (isDebugLoggingEnabled()) {
+                Log.w(TAG, "predictWithLatest skipped: model not ready, status=" + prefs.getString(AppPrefs.KEY_ML_STATUS, MlRuntimeStatus.MODEL_UNAVAILABLE));
+            }
             return MlPredictionResult.statusOnly(prefs.getString(AppPrefs.KEY_ML_STATUS, MlRuntimeStatus.MODEL_UNAVAILABLE));
         }
 
@@ -54,7 +62,9 @@ public final class MlRuntimeEngine {
         if (window.isEmpty()) {
             setStatus(prefs, MlRuntimeStatus.WARMING_UP);
             int historyCount = MlHistoryStore.readHistory(prefs).size();
-            Log.d(TAG, "predictWithLatest warming up: history_count=" + historyCount + ", need_window=" + meta.windowSize);
+            if (isDebugLoggingEnabled()) {
+                Log.d(TAG, "predictWithLatest warming up: history_count=" + historyCount + ", need_window=" + meta.windowSize);
+            }
             return MlPredictionResult.statusOnly(MlRuntimeStatus.WARMING_UP);
         }
 
@@ -62,7 +72,9 @@ public final class MlRuntimeEngine {
             float[][][] input = MlFeatureBuilder.buildModelInput(window, meta);
             float normPrediction = predictor.predict(input);
             int mgdlPrediction = MlFeatureBuilder.denormalizePrediction(normPrediction, meta);
-            Log.d(TAG, "predictWithLatest success: norm=" + normPrediction + ", mgdl=" + mgdlPrediction);
+            if (isDebugLoggingEnabled()) {
+                Log.d(TAG, "predictWithLatest success: norm=" + normPrediction + ", mgdl=" + mgdlPrediction);
+            }
 
             MlPredictionSeriesStore.appendPoint(prefs, timestampMs, mgdlPrediction, latestSgv);
 
@@ -76,7 +88,7 @@ public final class MlRuntimeEngine {
             return MlPredictionResult.ready(mgdlPrediction);
         } catch (Exception e) {
             setStatus(prefs, MlRuntimeStatus.PREDICTION_FAILED);
-            Log.e(TAG, "predictWithLatest failed", e);
+            Log.e(TAG, "predictWithLatest failed");
             return MlPredictionResult.statusOnly(MlRuntimeStatus.PREDICTION_FAILED);
         }
     }
@@ -95,10 +107,12 @@ public final class MlRuntimeEngine {
                 MlMetadata parsedMeta;
                 try {
                     parsedMeta = MlMetadataParser.parseAndValidate(metadataJson);
-                    Log.d(TAG, "Metadata parsed: version=" + parsedMeta.modelVersion + ", model=" + parsedMeta.modelFile + ", window=" + parsedMeta.windowSize);
+                    if (isDebugLoggingEnabled()) {
+                        Log.d(TAG, "Metadata parsed: version=" + parsedMeta.modelVersion + ", model=" + parsedMeta.modelFile + ", window=" + parsedMeta.windowSize);
+                    }
                 } catch (Exception e) {
                     setStatus(prefs, MlRuntimeStatus.METADATA_INVALID);
-                    Log.e(TAG, "Metadata invalid", e);
+                    Log.e(TAG, "Metadata invalid");
                     return null;
                 }
                 File modelFile = MlAssetLoader.prepareModelFile(appContext, parsedMeta.modelFile);
@@ -106,13 +120,15 @@ public final class MlRuntimeEngine {
 
                 metadata = parsedMeta;
                 predictor = onnxPredictor;
-                Log.d(TAG, "Model ready from: " + modelFile.getAbsolutePath());
+                if (isDebugLoggingEnabled()) {
+                    Log.d(TAG, "Model ready from: " + modelFile.getAbsolutePath());
+                }
                 return metadata;
             } catch (Exception e) {
                 metadata = null;
                 predictor = null;
                 setStatus(prefs, MlRuntimeStatus.MODEL_UNAVAILABLE);
-                Log.e(TAG, "Model unavailable", e);
+                Log.e(TAG, "Model unavailable");
                 return null;
             }
         }
@@ -120,5 +136,9 @@ public final class MlRuntimeEngine {
 
     private void setStatus(SharedPreferences prefs, String status) {
         prefs.edit().putString(AppPrefs.KEY_ML_STATUS, status).apply();
+    }
+
+    private boolean isDebugLoggingEnabled() {
+        return (appContext.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     }
 }

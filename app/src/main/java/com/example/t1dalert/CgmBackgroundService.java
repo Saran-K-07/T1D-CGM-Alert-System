@@ -28,7 +28,6 @@ import java.util.ArrayList;
 public class CgmBackgroundService extends Service {
 
     private static final long WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L;
-    private static final String DEFAULT_UNCONSCIOUS_ESCALATION_NUMBER = "";
     private RequestQueue requestQueue;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private String lastSgv = "---";
@@ -185,6 +184,7 @@ public class CgmBackgroundService extends Service {
                 unconsciousConfidence,
                 lastLocation
         );
+        EmergencyRoutingPolicy.Decision routingDecision = EmergencyRoutingPolicy.decide(this, sharedPreferences);
         String encryptedMessage = SecureAlertMessageCodec.encrypt(sharedPreferences, message);
 
         SmsManager smsManager = getSmsManager();
@@ -225,6 +225,21 @@ public class CgmBackgroundService extends Service {
                 escalationRecipientForFallback = escalationNumber;
                 try {
                     sendSmsMessage(smsManager, escalationNumber, message);
+                    sentCount++;
+                } catch (Exception e) {
+                    failedCount++;
+                    AppMetrics.increment(this, AppPrefs.KEY_METRIC_SMS_SEND_FAILURE);
+                }
+            }
+        }
+
+        if (routingDecision.shouldSendEmergencyServiceSms) {
+            String emergencyRecipient = sanitizePhoneNumber(routingDecision.emergencyNumber);
+            if (!emergencyRecipient.isEmpty()) {
+                attemptedCount++;
+                try {
+                    String emergencyServiceMessage = buildEmergencyServiceMessage(message, lastLocation, routingDecision.countryIso);
+                    sendSmsMessage(smsManager, emergencyRecipient, emergencyServiceMessage);
                     sentCount++;
                 } catch (Exception e) {
                     failedCount++;
@@ -326,7 +341,22 @@ public class CgmBackgroundService extends Service {
     }
 
     private String getEscalationNumber(SharedPreferences prefs) {
-        return prefs.getString(AppPrefs.KEY_ESCALATION_NUMBER, DEFAULT_UNCONSCIOUS_ESCALATION_NUMBER);
+        return prefs.getString(AppPrefs.KEY_ESCALATION_NUMBER, AppConfig.DEFAULT_ESCALATION_NUMBER);
+    }
+
+    private String buildEmergencyServiceMessage(String baseMessage, String lastLocation, String countryIso) {
+        String safeBase = baseMessage == null ? "" : baseMessage.trim();
+        String safeLocation = lastLocation == null ? "" : lastLocation.trim();
+        String safeCountry = countryIso == null ? "" : countryIso.trim();
+        if (safeLocation.isEmpty()) {
+            return safeCountry.isEmpty()
+                    ? safeBase
+                    : safeBase + " Country: " + safeCountry + ".";
+        }
+        if (safeCountry.isEmpty()) {
+            return safeBase + " Location: " + safeLocation + ".";
+        }
+        return safeBase + " Location: " + safeLocation + ". Country: " + safeCountry + ".";
     }
 
     @Override

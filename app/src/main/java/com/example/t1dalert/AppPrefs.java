@@ -54,6 +54,9 @@ public final class AppPrefs {
     public static final String KEY_UNCONSCIOUS_TELEMETRY = "unconscious_telemetry";
     public static final String KEY_LAST_LOCATION = "last_location";
     public static final String KEY_LAST_LOCATION_AT = "last_location_at";
+    public static final String KEY_LAST_DETECTED_COUNTRY = "last_detected_country";
+    public static final String KEY_EMERGENCY_SERVICE_SMS_OPT_IN = "emergency_service_sms_opt_in";
+    public static final String KEY_MANUAL_EMERGENCY_COUNTRY = "manual_emergency_country";
 
     public static final String KEY_METRIC_CGM_NETWORK_ERROR = "metric_cgm_network_error";
     public static final String KEY_METRIC_CGM_SCHEMA_ERROR = "metric_cgm_schema_error";

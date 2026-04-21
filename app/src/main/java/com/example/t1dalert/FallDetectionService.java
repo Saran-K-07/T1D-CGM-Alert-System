@@ -11,6 +11,7 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.content.pm.PackageManager;
+import android.content.pm.ApplicationInfo;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -186,7 +187,9 @@ public class FallDetectionService extends Service implements SensorEventListener
 
         if (freeFallDetected && magnitude > IMPACT_THRESHOLD && (now - freeFallTimestamp) <= IMPACT_WINDOW_MS) {
             startTelemetryWindow(now, magnitude);
-            Log.w(TAG, "Impact detected, collecting telemetry for unconsciousness inference");
+            if (isDebugLoggingEnabled()) {
+                Log.w(TAG, "Impact detected, collecting telemetry for unconsciousness inference");
+            }
             return;
         }
 
@@ -276,15 +279,19 @@ public class FallDetectionService extends Service implements SensorEventListener
             saveLastKnownLocation();
             NotificationHelper.updateFallDetectionNotification(this, impactG, postureRatio, confidence);
             launchFallFullscreenAlert(confidence);
-            Log.e(TAG, "Unconsciousness likely: " + telemetry);
+            Log.e(TAG, "Unconsciousness likely");
         } else {
-            Log.d(TAG, "Fall not classified as unconscious: " + telemetry);
+            if (isDebugLoggingEnabled()) {
+                Log.d(TAG, "Fall not classified as unconscious");
+            }
         }
     }
 
     private void launchFallFullscreenAlert(float confidence) {
         if (!Settings.canDrawOverlays(this)) {
-            Log.w(TAG, "Overlay permission missing, cannot show full-screen fall alert");
+            if (isDebugLoggingEnabled()) {
+                Log.w(TAG, "Overlay permission missing, cannot show full-screen fall alert");
+            }
             return;
         }
 
@@ -359,7 +366,9 @@ public class FallDetectionService extends Service implements SensorEventListener
     private void saveLastKnownLocation() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
                 && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Log.w(TAG, "Location permission unavailable during unconscious detection");
+            if (isDebugLoggingEnabled()) {
+                Log.w(TAG, "Location permission unavailable during unconscious detection");
+            }
             return;
         }
 
@@ -371,7 +380,9 @@ public class FallDetectionService extends Service implements SensorEventListener
         }
         LocationManager locationManager = (LocationManager) attributedContext.getSystemService(LOCATION_SERVICE);
         if (locationManager == null) {
-            Log.w(TAG, "LocationManager unavailable");
+            if (isDebugLoggingEnabled()) {
+                Log.w(TAG, "LocationManager unavailable");
+            }
             return;
         }
 
@@ -387,7 +398,9 @@ public class FallDetectionService extends Service implements SensorEventListener
                 }
             }
         } catch (SecurityException se) {
-            Log.w(TAG, "Location security exception", se);
+            if (isDebugLoggingEnabled()) {
+                Log.w(TAG, "Location security exception");
+            }
             return;
         }
 
@@ -396,7 +409,9 @@ public class FallDetectionService extends Service implements SensorEventListener
             return;
         }
 
-        Log.w(TAG, "No cached location, requesting fresh one-shot updates");
+        if (isDebugLoggingEnabled()) {
+            Log.w(TAG, "No cached location, requesting fresh one-shot updates");
+        }
         requestFreshLocation(locationManager);
     }
 
@@ -425,8 +440,14 @@ public class FallDetectionService extends Service implements SensorEventListener
                 }
             }, Looper.getMainLooper());
         } catch (Exception e) {
-            Log.w(TAG, "Unable to request location from provider: " + provider, e);
+            if (isDebugLoggingEnabled()) {
+                Log.w(TAG, "Unable to request location from provider: " + provider);
+            }
         }
+    }
+
+    private boolean isDebugLoggingEnabled() {
+        return (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     }
 
     private boolean isBetterLocation(Location candidate, Location currentBest) {
