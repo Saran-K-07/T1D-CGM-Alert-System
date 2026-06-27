@@ -48,6 +48,8 @@
     <string name="sms_send_failed">Emergency SMS failed to send</string>
     <string name="bypass_dnd_not_granted">Bypass DND not granted, please allow in settings</string>
     <string name="low_glucose_alert_title">LOW GLUCOSE ALERT!</string>
+    <string name="high_glucose_alert_title">HIGH GLUCOSE ALERT!</string>
+    <string name="high_glucose_alert_line2">Urgent attention required</string>
     <string name="low_glucose_alert_content">SGV: %1$s Trend: %2$s</string>
     <string name="current_sgv_label">Current SGV: %1$s</string>
     <string name="trend_label">Trend: %1$s</string>

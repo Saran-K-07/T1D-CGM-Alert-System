@@ -1,6 +1,5 @@
 package com.example.t1dalert;
 
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -19,6 +18,14 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.Volley;
+import com.example.t1dalert.CGM.Data.CgmData;
+import com.example.t1dalert.CGM.Repository.CgmRepository;
+import com.example.t1dalert.CGM.Utils.CgmUtils;
+import com.example.t1dalert.Core.AppConfig;
+import com.example.t1dalert.Core.AppPrefs;
+import com.example.t1dalert.Core.AppPrefsStore;
+import com.example.t1dalert.Core.Settings;
+import com.example.t1dalert.ML.MlPredictionChartActivity;
 
 public class LiveCgmActivity extends AppCompatActivity {
 

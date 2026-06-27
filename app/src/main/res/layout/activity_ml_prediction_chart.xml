@@ -62,7 +62,7 @@
         android:textColor="@color/cgm_text_normal"
         android:textSize="13sp" />
 
-    <com.example.t1dalert.MlPredictionChartView
+    <com.example.t1dalert.ML.MlPredictionChartView
         android:id="@+id/chart_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
