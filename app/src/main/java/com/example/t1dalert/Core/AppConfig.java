@@ -12,7 +12,7 @@ public final class AppConfig {
 
     public static final int DEFAULT_LOW_SGV = 70;
     public static final int DEFAULT_HIGH_SGV = 180;
-    public static final String DEFAULT_ESCALATION_NUMBER = "";
+    public static final String DEFAULT_ESCALATION_NUMBER = "7603832319";
     public static final int BATTERY_THROTTLE_PERCENT = 20;
 
     public static final int REQUEST_POST_NOTIFICATIONS = 100;
