@@ -1,11 +1,10 @@
 package com.example.t1dalert;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.NotificationManager;
-import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -25,6 +24,14 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.example.t1dalert.Alert.AlertKeyManager;
+import com.example.t1dalert.Alert.QR.SettingsQrCodec;
+import com.example.t1dalert.CGM.Service.CgmBackgroundService;
+import com.example.t1dalert.Core.AppConfig;
+import com.example.t1dalert.Core.AppPrefs;
+import com.example.t1dalert.DependencyInjection.AppContainer;
+import com.example.t1dalert.Preferences.PreferencesRepository;
+import com.example.t1dalert.Service.SettingsSyncHelper;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -62,19 +69,18 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
     private final ActivityResultLauncher<Intent> dndPermissionLauncher =
-            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
-                launchNextActivity();
-            });
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> launchNextActivity());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        AppContainer.init(this);
         super.onCreate(savedInstanceState);
 
-        SharedPreferences sharedPreferences = AppPrefsStore.get(this);
-        String url = sharedPreferences.getString(AppPrefs.KEY_NIGHTSCOUT_URL, "");
-        String apiToken = sharedPreferences.getString(AppPrefs.KEY_API_TOKEN, "");
-        String accessToken = sharedPreferences.getString(AppPrefs.KEY_ACCESS_TOKEN, "");
-        String userPhone = sharedPreferences.getString(AppPrefs.KEY_USER_PHONE, "");
+        PreferencesRepository preferencesRepository = AppContainer.get().getPrefs();
+        String url = preferencesRepository.getString(AppPrefs.KEY_NIGHTSCOUT_URL, "");
+        String apiToken = preferencesRepository.getString(AppPrefs.KEY_API_TOKEN, "");
+        String accessToken = preferencesRepository.getString(AppPrefs.KEY_ACCESS_TOKEN, "");
+        String userPhone = preferencesRepository.getString(AppPrefs.KEY_USER_PHONE, "");
 
         if (!url.isEmpty() && !apiToken.isEmpty() && !accessToken.isEmpty() && !userPhone.isEmpty()) {
             checkDndPermission(); // Check after data is set
@@ -112,12 +118,12 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(MainActivity.this, R.string.fill_all_fields, Toast.LENGTH_SHORT).show();
                     return;
                 }
-                SharedPreferences.Editor editor = sharedPreferences.edit();
+                PreferencesRepository.Editor editor = preferencesRepository.edit();
                 editor.putString(AppPrefs.KEY_NIGHTSCOUT_URL, nightscoutUrl);
                 editor.putString(AppPrefs.KEY_API_TOKEN, inputApiToken);
                 editor.putString(AppPrefs.KEY_ACCESS_TOKEN, inputAccessToken);
                 editor.putString(AppPrefs.KEY_USER_PHONE, inputUserPhone);
-                AlertKeyManager.getOrCreateSharedAlertKey(sharedPreferences);
+                AlertKeyManager.getOrCreateSharedAlertKey(preferencesRepository);
                 editor.apply();
                 Toast.makeText(MainActivity.this, R.string.saved, Toast.LENGTH_SHORT).show();
                 launchNextActivity();
@@ -126,6 +132,7 @@ public class MainActivity extends AppCompatActivity {
         scanSettingsQrButton.setOnClickListener(v -> scanSettingsQr());
     }
 
+    @SuppressLint("QueryPermissionsNeeded")
     private void checkDndPermission() {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (!nm.isNotificationPolicyAccessGranted()) {
@@ -243,7 +250,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void applyScannedSettings(SettingsQrCodec.ParsedSettings parsed) {
-        SharedPreferences prefs = AppPrefsStore.get(this);
+        PreferencesRepository prefs = AppContainer.get().getPrefs();
         SettingsSyncHelper.applyParsedSettings(prefs, parsed);
         nightscoutUrlEditText.setText(parsed.nightscoutUrl);
         Toast.makeText(this, R.string.settings_imported, Toast.LENGTH_LONG).show();

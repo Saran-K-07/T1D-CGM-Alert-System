@@ -4,7 +4,6 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -30,11 +29,19 @@ import androidx.core.app.NotificationCompat;
 
 import androidx.annotation.Nullable;
 
+import com.example.t1dalert.Core.AppPrefs;
+import com.example.t1dalert.Core.AppPrefsStore;
+
 public class LowAlertOverlayService extends Service {
 
     public static final String EXTRA_ALERT_TITLE = "alert_title";
     public static final String EXTRA_ALERT_LINE_1 = "alert_line_1";
     public static final String EXTRA_ALERT_LINE_2 = "alert_line_2";
+    public static final String EXTRA_ALERT_STYLE = "alert_style";
+    public static final String EXTRA_ALERT_NOTIFY_ONLY = "alert_notify_only";
+
+    public static final int STYLE_LOW = 0;
+    public static final int STYLE_HIGH = 1;
 
     private WindowManager windowManager;
     private View overlayView;
@@ -70,19 +77,21 @@ public class LowAlertOverlayService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
-            audioManager.abandonAudioFocusRequest(audioFocusRequest);
-        } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            audioManager.abandonAudioFocus(null);
-        }
-        if (audioManager != null && previousAlarmVolume >= 0) {
-            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, previousAlarmVolume, 0);
+        if (audioManager != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
+                audioManager.abandonAudioFocusRequest(audioFocusRequest);
+            } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                audioManager.abandonAudioFocus(null);
+            }
+            if (previousAlarmVolume >= 0) {
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, previousAlarmVolume, 0);
+            }
         }
         if (vibrator != null) {
             vibrator.cancel();
         }
         stopContinuousBuzzer();
-        if (overlayView != null) {
+        if (overlayView != null && overlayAdded) {
             windowManager.removeView(overlayView);
         }
     }
@@ -100,12 +109,19 @@ public class LowAlertOverlayService extends Service {
         String alertTitleExtra = serviceIntent.getStringExtra(EXTRA_ALERT_TITLE);
         String alertLine1Extra = serviceIntent.getStringExtra(EXTRA_ALERT_LINE_1);
         String alertLine2Extra = serviceIntent.getStringExtra(EXTRA_ALERT_LINE_2);
+        int alertStyle = serviceIntent.getIntExtra(EXTRA_ALERT_STYLE, STYLE_LOW);
+        boolean notifyOnly = serviceIntent.getBooleanExtra(EXTRA_ALERT_NOTIFY_ONLY, false);
+        String defaultTitle = alertStyle == STYLE_HIGH
+                ? getString(R.string.high_glucose_alert_title)
+                : getString(R.string.low_glucose_alert_title);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-            String alertChannelId = "low_alert_channel";
-            CharSequence name = "Low Glucose Alerts";
-            String description = "Critical alerts for low blood sugar";
+            String alertChannelId = alertStyle == STYLE_HIGH ? "high_alert_channel" : "low_alert_channel";
+            CharSequence name = alertStyle == STYLE_HIGH ? "High Glucose Alerts" : "Low Glucose Alerts";
+            String description = alertStyle == STYLE_HIGH
+                    ? "Emergency alerts for high blood sugar"
+                    : "Critical alerts for low blood sugar";
             int importance = NotificationManager.IMPORTANCE_LOW;
             NotificationChannel channel = new NotificationChannel(alertChannelId, name, importance);
             channel.setDescription(description);
@@ -118,14 +134,19 @@ public class LowAlertOverlayService extends Service {
             PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
 
             String safeTitle = (alertTitleExtra == null || alertTitleExtra.trim().isEmpty())
-                    ? getString(R.string.low_glucose_alert_title)
+                    ? defaultTitle
                     : alertTitleExtra.trim();
             String safeLine1 = (alertLine1Extra == null || alertLine1Extra.trim().isEmpty())
                     ? getString(R.string.current_sgv_label, sgv == null ? "---" : sgv)
                     : alertLine1Extra.trim();
-            String safeLine2 = (alertLine2Extra == null || alertLine2Extra.trim().isEmpty())
-                    ? getString(R.string.trend_label, trend == null ? "?" : trend)
-                    : alertLine2Extra.trim();
+            String safeLine2;
+            if (alertLine2Extra == null || alertLine2Extra.trim().isEmpty()) {
+                safeLine2 = alertStyle == STYLE_HIGH
+                        ? getString(R.string.high_glucose_alert_line2)
+                        : getString(R.string.trend_label, trend == null ? "?" : trend);
+            } else {
+                safeLine2 = alertLine2Extra.trim();
+            }
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this, alertChannelId)
                     .setSmallIcon(R.mipmap.ic_launcher)
@@ -147,19 +168,26 @@ public class LowAlertOverlayService extends Service {
         String safeSgv = sgv == null ? "---" : sgv;
         String safeTrend = trend == null ? "?" : trend;
         String safeTitle = (alertTitleExtra == null || alertTitleExtra.trim().isEmpty())
-                ? getString(R.string.low_glucose_alert_title)
+                ? defaultTitle
                 : alertTitleExtra.trim();
         String safeLine1 = (alertLine1Extra == null || alertLine1Extra.trim().isEmpty())
                 ? getString(R.string.current_sgv_label, safeSgv)
                 : alertLine1Extra.trim();
-        String safeLine2 = (alertLine2Extra == null || alertLine2Extra.trim().isEmpty())
-                ? getString(R.string.trend_label, safeTrend)
-                : alertLine2Extra.trim();
+        String safeLine2;
+        if (alertLine2Extra == null || alertLine2Extra.trim().isEmpty()) {
+            safeLine2 = alertStyle == STYLE_HIGH
+                    ? getString(R.string.high_glucose_alert_line2)
+                    : getString(R.string.trend_label, safeTrend);
+        } else {
+            safeLine2 = alertLine2Extra.trim();
+        }
         alertText.setText(safeTitle);
         sgvText.setText(safeLine1);
         trendText.setText(safeLine2);
 
-        overlayView.findViewById(R.id.alert_root).setBackgroundColor(Color.RED);
+        overlayView.findViewById(R.id.alert_root).setBackgroundColor(
+                alertStyle == STYLE_HIGH ? Color.parseColor("#D66A00") : Color.RED
+        );
 
         SeekBar dismissSlider = overlayView.findViewById(R.id.dismiss_slider);
         dismissSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -208,23 +236,25 @@ public class LowAlertOverlayService extends Service {
         );
         params.gravity = Gravity.TOP;
 
-        windowManager.addView(overlayView, params);
-        overlayAdded = true;
+        if (!notifyOnly) {
+            windowManager.addView(overlayView, params);
+            overlayAdded = true;
 
-        if (vibrator != null && vibrator.hasVibrator()) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createWaveform(new long[]{0, 1000}, 0));
-            } else {
-                vibrator.vibrate(new long[]{0, 1000}, 0);
+            if (vibrator != null && vibrator.hasVibrator()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createWaveform(new long[]{0, 1000}, 0));
+                } else {
+                    vibrator.vibrate(new long[]{0, 1000}, 0);
+                }
             }
-        }
 
-        audioManager.setStreamMute(AudioManager.STREAM_ALARM, false);
-        previousAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
-        int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM);
-        audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxVolume, 0);
-        requestAudioFocus();
-        startContinuousBuzzer();
+            audioManager.setStreamMute(AudioManager.STREAM_ALARM, false);
+            previousAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
+            int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM);
+            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxVolume, 0);
+            requestAudioFocus();
+            startContinuousBuzzer();
+        }
     }
 
     private void requestAudioFocus() {
