@@ -1,4 +1,21 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
+// Security: force patched Bouncy Castle (CVE-2025-14813 GOST CTR keystream reuse, GHSA-574f-3g2m-x479).
+// bcprov-jdk18on is a transitive build-classpath dep via AGP/UTP (e.g. 1.79 vulnerable, needs >= 1.80.2, using 1.84).
+buildscript {
+    configurations.classpath {
+        resolutionStrategy {
+            force("org.bouncycastle:bcprov-jdk18on:1.84")
+        }
+    }
+    dependencies {
+        constraints {
+            classpath("org.bouncycastle:bcprov-jdk18on:1.84") {
+                because("CVE-2025-14813: GOST 28147 CTR reuses keystream after 255 blocks; patched in 1.80.2/1.81.1/1.84")
+            }
+        }
+    }
+}
+
 plugins {
     alias(libs.plugins.android.application) apply false
 }
