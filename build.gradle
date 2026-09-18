@@ -4,12 +4,12 @@
 buildscript {
     configurations.classpath {
         resolutionStrategy {
-            force("org.bouncycastle:bcprov-jdk18on:1.84")
+            force("org.bouncycastle:bcprov-jdk18on:1.85")
         }
     }
     dependencies {
         constraints {
-            classpath("org.bouncycastle:bcprov-jdk18on:1.84") {
+            classpath("org.bouncycastle:bcprov-jdk18on:1.85") {
                 because("CVE-2025-14813: GOST 28147 CTR reuses keystream after 255 blocks; patched in 1.80.2/1.81.1/1.84")
             }
         }
